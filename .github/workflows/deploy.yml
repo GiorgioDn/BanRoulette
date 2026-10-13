@@ -1,0 +1,101 @@
+name: Build & Release
+
+on:
+  push:
+    branches: [ main ]
+
+# Cancel any in-progress run for the same branch when a new push arrives
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Allow creating GitHub Releases and uploading assets
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            script: bash scripts/package.sh
+            artifact_glob: ban_roulette/target/installer/*.deb
+            artifact_name: BanRoulette-linux.deb
+
+          - os: macos-latest
+            script: bash scripts/package.sh
+            artifact_glob: ban_roulette/target/installer/*.pkg
+            artifact_name: BanRoulette-macos.pkg
+
+          - os: windows-latest
+            script: pwsh scripts/package.ps1
+            artifact_glob: ban_roulette/target/installer/*.exe
+            artifact_name: BanRoulette-windows.exe
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      # Build + run tests + stage jpackage-input/
+      - name: Build with Maven
+        run: mvn -B verify --file ban_roulette/pom.xml
+
+      # Run the platform packaging script
+      - name: Package installer
+        run: ${{ matrix.script }}
+
+      # Give each artifact a stable, OS-specific name for the release
+      - name: Rename artifact
+        shell: bash
+        run: |
+          src=$(find ban_roulette/target/installer -maxdepth 1 \
+                  \( -name "*.deb" -o -name "*.pkg" -o -name "*.exe" \) \
+                  | head -n 1)
+          cp "$src" "${{ matrix.artifact_name }}"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.artifact_name }}
+          if-no-files-found: error
+
+  release:
+    name: Publish GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download all installers
+        uses: actions/download-artifact@v4
+        with:
+          path: installers/
+          merge-multiple: true
+
+      - name: Create / update GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: "Build #${{ github.run_number }} (${{ github.sha }})"
+          body: |
+            Automated build from commit `${{ github.sha }}`.
+
+            > ⚠️ **Unsigned installers** – macOS Gatekeeper and Windows SmartScreen
+            > will warn on first launch. Right-click → Open to bypass on macOS.
+          files: installers/*
+          generate_release_notes: false
