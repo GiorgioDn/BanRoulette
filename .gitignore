@@ -1,0 +1,79 @@
+# ---------- Maven build output ----------
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+.mvn/wrapper/maven-wrapper.jar
+
+# ---------- Java ----------
+*.class
+*.log
+*.ctxt
+.mtj.tmp/
+*.jar
+*.war
+*.nar
+*.ear
+*.zip
+*.tar.gz
+*.rar
+hs_err_pid*
+replay_pid*
+
+# ---------- Native installers (jpackage output) ----------
+dist/
+installers/
+*.dmg
+*.pkg
+*.msi
+*.exe
+*.deb
+*.rpm
+*.AppImage
+*.app/
+
+# ---------- H2 database files (local dev data) ----------
+*.mv.db
+*.trace.db
+*.lock.db
+*.h2.db
+.banroulette/
+
+# ---------- IDEs ----------
+.idea/
+*.iml
+*.iws
+.vscode/
+.classpath
+.project
+.settings/
+.factorypath
+nbproject/
+nbbuild/
+nbdist/
+
+# ---------- OS files ----------
+.DS_Store
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# ---------- Secrets and local config ----------
+.env
+*.pem
+*.p12
+*.key
+*.keystore
+*.jks
+local.properties
+
+# ---------- Personal file ----------
+plan.md
