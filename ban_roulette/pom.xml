@@ -30,6 +30,21 @@
             <artifactId>javafx-fxml</artifactId>
             <version>${javafx.version}</version>
         </dependency>
+
+        <!-- H2 embedded database (used in Step 3) -->
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <version>2.2.224</version>
+        </dependency>
+
+        <!-- JUnit 5 (test scope) -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>5.10.2</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
@@ -42,7 +57,8 @@
                 <version>3.13.0</version>
             </plugin>
 
-            <!-- 2. Jar: set Main-Class in the manifest -->
+            <!-- 2. Jar: set Main-Class in the manifest (AppLauncher avoids the
+                 JavaFX bootstrap issue when Main-Class extends Application) -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-jar-plugin</artifactId>
@@ -50,10 +66,17 @@
                 <configuration>
                     <archive>
                         <manifest>
-                            <mainClass>com.example.App</mainClass>
+                            <mainClass>com.example.app.AppLauncher</mainClass>
                         </manifest>
                     </archive>
                 </configuration>
+            </plugin>
+
+            <!-- 2b. Surefire 3.x auto-detects JUnit 5 on the classpath -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.2.5</version>
             </plugin>
 
             <!-- 3. Copy runtime deps + app jar to jpackage-input/ -->
@@ -104,7 +127,7 @@
                         <!-- Usage: mvn clean javafx:run -->
                         <id>default-cli</id>
                         <configuration>
-                            <mainClass>com.example/com.example.App</mainClass>
+                            <mainClass>com.example/com.example.app.App</mainClass>
                         </configuration>
                     </execution>
                 </executions>

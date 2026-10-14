@@ -10,7 +10,7 @@ $ProjectDir  = Join-Path $ScriptDir ".." "ban_roulette"
 $InputDir    = Join-Path $ProjectDir "target" "jpackage-input"
 $OutputDir   = Join-Path $ProjectDir "target" "installer"
 $MainJar     = "ban_roulette-1.0.0.jar"
-$MainClass   = "com.example.App"
+$MainClass   = "com.example.app.AppLauncher"
 $AppName     = "BanRoulette"
 $AppVersion  = "1.0.0"
 

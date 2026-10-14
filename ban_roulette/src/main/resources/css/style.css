@@ -1,0 +1,263 @@
+/* ===================================================================
+   Ban Roulette — Global Stylesheet  (JavaFX CSS)
+   =================================================================== */
+
+/* ── Root / Scene ─────────────────────────────────────────────────── */
+.root {
+    -fx-background-color: #0b1120;
+    -fx-font-family: "Segoe UI", "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+    -fx-font-size: 14px;
+}
+
+/* ── Sidebar container ────────────────────────────────────────────── */
+.sidebar {
+    -fx-background-color: #111827;
+    -fx-border-color: #1f2937;
+    -fx-border-width: 0 1 0 0;
+}
+
+/* Brand header strip */
+.sidebar-header {
+    -fx-background-color: #0d1117;
+}
+
+.sidebar-sep .line {
+    -fx-border-color: #1f2937;
+    -fx-border-width: 1 0 0 0;
+}
+
+/* Pinned action area at the bottom of the sidebar */
+.sidebar-actions {
+    -fx-background-color: #0d1117;
+    -fx-border-color: #1f2937;
+    -fx-border-width: 1 0 0 0;
+}
+
+/* ── App title & subtitle ─────────────────────────────────────────── */
+.app-title {
+    -fx-text-fill: #f9fafb;
+    -fx-font-size: 20px;
+    -fx-font-weight: bold;
+}
+
+.app-subtitle {
+    -fx-text-fill: #6b7280;
+    -fx-font-size: 12px;
+    -fx-font-style: italic;
+}
+
+/* ── Section header labels ────────────────────────────────────────── */
+.section-label {
+    -fx-text-fill: #6b7280;
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+    -fx-padding: 4 0 2 0;
+}
+
+/* ── Name input (TextField) ───────────────────────────────────────── */
+.name-input {
+    -fx-background-color: #1f2937;
+    -fx-text-fill: #f3f4f6;
+    -fx-prompt-text-fill: #4b5563;
+    -fx-border-color: #374151;
+    -fx-border-radius: 7;
+    -fx-background-radius: 7;
+    -fx-padding: 9 12;
+    -fx-font-size: 14px;
+}
+
+.name-input:focused {
+    -fx-border-color: #7c3aed;
+    -fx-effect: dropshadow(gaussian, rgba(124,58,237,0.35), 10, 0, 0, 0);
+}
+
+/* ── Button — Add (violet) ────────────────────────────────────────── */
+.btn-add {
+    -fx-background-color: #7c3aed;
+    -fx-text-fill: #ffffff;
+    -fx-border-radius: 7;
+    -fx-background-radius: 7;
+    -fx-padding: 9 20;
+    -fx-cursor: hand;
+    -fx-font-weight: bold;
+    -fx-font-size: 14px;
+}
+
+.btn-add:hover {
+    -fx-background-color: #6d28d9;
+    -fx-effect: dropshadow(gaussian, rgba(124,58,237,0.5), 12, 0, 0, 0);
+    -fx-scale-x: 1.03;
+    -fx-scale-y: 1.03;
+}
+
+.btn-add:pressed {
+    -fx-background-color: #5b21b6;
+    -fx-scale-x: 0.97;
+    -fx-scale-y: 0.97;
+}
+
+/* ── Button — Secondary (ghost) ───────────────────────────────────── */
+.btn-secondary {
+    -fx-background-color: #1f2937;
+    -fx-text-fill: #9ca3af;
+    -fx-border-color: #374151;
+    -fx-border-radius: 7;
+    -fx-background-radius: 7;
+    -fx-padding: 10 14;
+    -fx-cursor: hand;
+    -fx-font-size: 13px;
+}
+
+.btn-secondary:hover {
+    -fx-background-color: #374151;
+    -fx-text-fill: #e5e7eb;
+}
+
+.btn-secondary:pressed {
+    -fx-background-color: #4b5563;
+}
+
+/* ── Button — Spin (amber→red gradient, primary CTA) ─────────────── */
+.btn-spin {
+    -fx-background-color: linear-gradient(to right, #f59e0b, #ef4444);
+    -fx-text-fill: #ffffff;
+    -fx-border-radius: 7;
+    -fx-background-radius: 7;
+    -fx-padding: 10 14;
+    -fx-cursor: hand;
+    -fx-font-weight: bold;
+    -fx-font-size: 14px;
+}
+
+.btn-spin:hover {
+    -fx-background-color: linear-gradient(to right, #d97706, #dc2626);
+    -fx-effect: dropshadow(gaussian, rgba(239,68,68,0.45), 14, 0, 0, 0);
+    -fx-scale-x: 1.03;
+    -fx-scale-y: 1.03;
+}
+
+.btn-spin:pressed {
+    -fx-scale-x: 0.97;
+    -fx-scale-y: 0.97;
+}
+
+.btn-spin:disabled {
+    -fx-background-color: #1f2937;
+    -fx-text-fill: #4b5563;
+    -fx-effect: none;
+    -fx-cursor: default;
+    -fx-opacity: 1.0;
+}
+
+/* ── Participant ListView ──────────────────────────────────────────── */
+.participant-list {
+    -fx-background-color: #0b1120;
+    -fx-border-color: #1f2937;
+    -fx-border-radius: 7;
+    -fx-background-radius: 7;
+    -fx-padding: 4;
+    -fx-background-insets: 0;
+}
+
+.participant-list .list-cell {
+    -fx-background-color: transparent;
+    -fx-text-fill: #d1d5db;
+    -fx-padding: 9 12;
+    -fx-font-size: 14px;
+    -fx-border-radius: 5;
+    -fx-background-radius: 5;
+}
+
+.participant-list .list-cell:odd {
+    -fx-background-color: transparent;
+}
+
+.participant-list .list-cell:hover {
+    -fx-background-color: #1f2937;
+    -fx-text-fill: #f3f4f6;
+}
+
+.participant-list .list-cell:selected {
+    -fx-background-color: #3b1f6e;
+    -fx-text-fill: #e9d5ff;
+}
+
+.participant-list .list-cell:selected:hover {
+    -fx-background-color: #4c1d95;
+}
+
+/* Slim custom scroll bar */
+.participant-list .scroll-bar:vertical {
+    -fx-background-color: transparent;
+    -fx-pref-width: 8;
+}
+
+.participant-list .scroll-bar:vertical .thumb {
+    -fx-background-color: #374151;
+    -fx-background-radius: 4;
+}
+
+.participant-list .scroll-bar:vertical .thumb:hover {
+    -fx-background-color: #4b5563;
+}
+
+.participant-list .scroll-bar:vertical .track,
+.participant-list .scroll-bar:vertical .track-background {
+    -fx-background-color: transparent;
+}
+
+.participant-list .scroll-bar:vertical .increment-button,
+.participant-list .scroll-bar:vertical .decrement-button {
+    -fx-background-color: transparent;
+    -fx-padding: 0;
+}
+
+.participant-list .scroll-bar:vertical .increment-arrow,
+.participant-list .scroll-bar:vertical .decrement-arrow {
+    -fx-shape: "";
+    -fx-padding: 0;
+}
+
+/* ── Inline status label (above the action buttons) ──────────────── */
+.status-label {
+    -fx-text-fill: #6b7280;
+    -fx-font-size: 12px;
+    -fx-padding: 2 0;
+}
+
+/* ── Center wheel canvas ──────────────────────────────────────────── */
+.wheel-container {
+    -fx-background-color: radial-gradient(center 50% 50%, radius 70%, #111827 0%, #0b1120 100%);
+}
+
+.wheel-placeholder-box {
+    -fx-alignment: center;
+}
+
+.wheel-icon {
+    -fx-font-size: 80px;
+}
+
+.wheel-placeholder {
+    -fx-text-fill: #374151;
+    -fx-font-size: 16px;
+    -fx-text-alignment: center;
+    -fx-line-spacing: 6;
+}
+
+/* ── Bottom status bar ─────────────────────────────────────────────── */
+.status-bar {
+    -fx-background-color: #0d1117;
+    -fx-border-color: #1f2937;
+    -fx-border-width: 1 0 0 0;
+}
+
+.status-dot {
+    -fx-text-fill: #22c55e;
+    -fx-font-size: 9px;
+}
+
+.status-bar-text {
+    -fx-text-fill: #6b7280;
+    -fx-font-size: 12px;
+}
