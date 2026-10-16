@@ -1,9 +1,14 @@
 package com.example.ui;
 
+import com.example.db.BannedDao;
+import com.example.db.DatabaseManager;
+import com.example.db.NameDao;
 import com.example.model.Participant;
 import com.example.svg.WheelGenerator;
+import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
+import javafx.concurrent.Task;
 import javafx.fxml.FXML;
 import javafx.scene.Group;
 import javafx.scene.control.Button;
@@ -13,20 +18,29 @@ import javafx.scene.control.ListView;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.StackPane;
 
+import java.sql.SQLException;
+import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
 /**
  * Controller for {@code main.fxml} — the primary application window.
  *
- * <p>Responsibilities at this stage (Step 2 skeleton):
+ * <p>Responsibilities (Step 3):
  * <ul>
- *   <li>Manage the observable participant list.</li>
- *   <li>Validate and add / remove names.</li>
- *   <li>Delegate wheel drawing to {@link WheelGenerator} (stub until Step 4).</li>
- *   <li>Keep the status bar and spin-button state in sync.</li>
+ *   <li>Receive a {@link DatabaseManager} via {@link #setDatabaseManager}
+ *       (called by {@code App} after FXML loading).</li>
+ *   <li>On startup, load saved participants from {@code names} table off the
+ *       FX thread and update the UI with {@code Platform.runLater}.</li>
+ *   <li>Persist every add / clear to the DB via a background {@link Task}.</li>
+ *   <li>Keep the UI fully functional when the DB is unavailable (null guard).</li>
  * </ul>
  *
- * <p>Steps 3–7 will wire in the DB layer, real animations, and ban persistence.
+ * <p>Steps 5–7 will wire in the spin animation, hit animation, and ban persistence.
  */
 public class MainController {
+
+    private static final Logger LOG = Logger.getLogger(MainController.class.getName());
 
     // ── FXML-injected nodes ────────────────────────────────────────────────────
 
@@ -46,6 +60,25 @@ public class MainController {
             FXCollections.observableArrayList();
 
     private final WheelGenerator wheelGenerator = new WheelGenerator();
+
+    /** Injected by {@code App.start()} after FXML loading. May be null if DB failed to open. */
+    private DatabaseManager dbManager;
+
+    // ── DB injection ───────────────────────────────────────────────────────────
+
+    /**
+     * Called by {@link com.example.app.App} right after FXML loading.
+     * Kicks off a background task to load saved names from the database.
+     *
+     * @param dbManager the open database manager; may be {@code null} if the
+     *                  DB connection failed (app still works in-memory only)
+     */
+    public void setDatabaseManager(DatabaseManager dbManager) {
+        this.dbManager = dbManager;
+        if (dbManager != null && dbManager.getConnection() != null) {
+            loadNamesFromDb();
+        }
+    }
 
     // ── Lifecycle ──────────────────────────────────────────────────────────────
 
@@ -76,12 +109,26 @@ public class MainController {
             return;
         }
 
-        participants.add(new Participant(name));
+        // Optimistic UI update: add in-memory immediately so the user sees instant feedback
+        Participant p = new Participant(name);
+        participants.add(p);
         nameInput.clear();
         nameInput.requestFocus();
-
         refreshWheel();
         updateUI();
+
+        // Persist to DB in the background, then back-fill the generated id
+        if (dbManager != null) {
+            Task<Long> insertTask = new Task<>() {
+                @Override protected Long call() throws Exception {
+                    return new NameDao(dbManager.getConnection()).insert(name);
+                }
+            };
+            insertTask.setOnSucceeded(e -> p.setId(insertTask.getValue()));
+            insertTask.setOnFailed(e ->
+                    LOG.log(Level.WARNING, "Failed to persist participant", insertTask.getException()));
+            new Thread(insertTask, "db-insert").start();
+        }
     }
 
     @FXML
@@ -90,6 +137,18 @@ public class MainController {
         statusLabel.setText("");
         refreshWheel();
         updateUI();
+
+        if (dbManager != null) {
+            Task<Void> clearTask = new Task<>() {
+                @Override protected Void call() throws Exception {
+                    new NameDao(dbManager.getConnection()).deleteAll();
+                    return null;
+                }
+            };
+            clearTask.setOnFailed(e ->
+                    LOG.log(Level.WARNING, "Failed to clear participants in DB", clearTask.getException()));
+            new Thread(clearTask, "db-clear").start();
+        }
     }
 
     @FXML
@@ -101,10 +160,39 @@ public class MainController {
         flashStatus("Spinning… (full animation arrives in Step 5)");
         // TODO Step 5: pick winner, compute targetAngle, run SpinAnimation
         // TODO Step 6: on spin finish, run HitAnimation, show ban dialog
-        // TODO Step 7: persist ban in DB, redraw wheel
+        // TODO Step 7: ban() in NameDao, redraw wheel
     }
 
     // ── Private helpers ────────────────────────────────────────────────────────
+
+    /**
+     * Loads all saved participants from the {@code names} table on a background
+     * thread, then populates the UI list with {@code Platform.runLater}.
+     */
+    private void loadNamesFromDb() {
+        Task<List<Participant>> loadTask = new Task<>() {
+            @Override protected List<Participant> call() throws Exception {
+                return new NameDao(dbManager.getConnection()).findAll();
+            }
+        };
+
+        loadTask.setOnSucceeded(e -> {
+            List<Participant> saved = loadTask.getValue();
+            Platform.runLater(() -> {
+                participants.setAll(saved);
+                refreshWheel();
+                updateUI();
+                if (!saved.isEmpty()) {
+                    flashStatus(saved.size() + " participant(s) loaded from database.");
+                }
+            });
+        });
+
+        loadTask.setOnFailed(e ->
+                LOG.log(Level.WARNING, "Failed to load participants from DB", loadTask.getException()));
+
+        new Thread(loadTask, "db-load").start();
+    }
 
     private void refreshWheel() {
         // Remove any previously generated wheel Group
