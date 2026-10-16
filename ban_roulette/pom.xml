@@ -72,11 +72,18 @@
                 </configuration>
             </plugin>
 
-            <!-- 2b. Surefire 3.x auto-detects JUnit 5 on the classpath -->
+            <!-- 2b. Surefire 3.x: add JavaFX to the test module path so
+                 WheelGeneratorTest can create scene-graph nodes headlessly -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.2.5</version>
+                <configuration>
+                    <argLine>
+                        --add-modules javafx.controls,javafx.graphics
+                        --add-opens javafx.graphics/com.sun.javafx.application=ALL-UNNAMED
+                    </argLine>
+                </configuration>
             </plugin>
 
             <!-- 3. Copy runtime deps + app jar to jpackage-input/ -->

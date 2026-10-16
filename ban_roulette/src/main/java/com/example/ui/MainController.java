@@ -17,6 +17,7 @@ import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.StackPane;
+import javafx.scene.layout.VBox;
 
 import java.sql.SQLException;
 import java.util.List;
@@ -48,8 +49,10 @@ public class MainController {
     @FXML private Button     addButton;
     @FXML private Button     clearButton;
     @FXML private Button     spinButton;
+    @FXML private Button     loadSavedButton;
     @FXML private ListView<Participant> participantList;
     @FXML private StackPane  wheelContainer;
+    @FXML private VBox       wheelPlaceholderBox;
     @FXML private Label      wheelPlaceholder;
     @FXML private Label      statusLabel;
     @FXML private Label      bottomStatus;
@@ -60,6 +63,12 @@ public class MainController {
             FXCollections.observableArrayList();
 
     private final WheelGenerator wheelGenerator = new WheelGenerator();
+
+    /**
+     * The rotating slice {@link Group} most recently built by {@link #refreshWheel()}.
+     * Step 5 reads this to apply the {@link com.example.anim.SpinAnimation}.
+     */
+    private Group currentWheel;
 
     /** Injected by {@code App.start()} after FXML loading. May be null if DB failed to open. */
     private DatabaseManager dbManager;
@@ -85,7 +94,8 @@ public class MainController {
     @FXML
     public void initialize() {
         participantList.setItems(participants);
-        participantList.setCellFactory(lv -> new ParticipantCell());
+        // Pass 'this' so the cell can call back into onRemoveParticipant()
+        participantList.setCellFactory(lv -> new ParticipantCell(this));
 
         // Allow pressing Enter in the text field to add a name
         nameInput.setOnAction(e -> onAddName());
@@ -106,6 +116,10 @@ public class MainController {
         }
         if (name.length() > 50) {
             flashStatus("Name too long — max 50 characters.");
+            return;
+        }
+        if (participants.size() >= WheelGenerator.MAX_PARTICIPANTS) {
+            flashStatus("Limit reached — max " + WheelGenerator.MAX_PARTICIPANTS + " participants.");
             return;
         }
 
@@ -152,6 +166,16 @@ public class MainController {
     }
 
     @FXML
+    private void onLoadSavedNames() {
+        if (dbManager != null && dbManager.getConnection() != null) {
+            flashStatus("Loading saved participants…");
+            loadNamesFromDb();
+        } else {
+            flashStatus("Database not available.");
+        }
+    }
+
+    @FXML
     private void onSpin() {
         if (participants.size() < 2) {
             flashStatus("Need at least 2 participants to spin.");
@@ -184,6 +208,8 @@ public class MainController {
                 updateUI();
                 if (!saved.isEmpty()) {
                     flashStatus(saved.size() + " participant(s) loaded from database.");
+                } else {
+                    flashStatus("No saved participants found in database.");
                 }
             });
         });
@@ -195,16 +221,37 @@ public class MainController {
     }
 
     private void refreshWheel() {
-        // Remove any previously generated wheel Group
-        wheelContainer.getChildren().removeIf(n -> n instanceof Group);
+        // Remove old wheel group and old pointer (anything that is not the placeholder VBox)
+        wheelContainer.getChildren().removeIf(
+                n -> n instanceof Group || "wheel-pointer".equals(n.getId()));
 
         if (participants.size() < 2) {
+            if (wheelPlaceholderBox != null) {
+                wheelPlaceholderBox.setVisible(true);
+                wheelPlaceholderBox.setManaged(true);
+            }
             wheelPlaceholder.setVisible(true);
+            currentWheel = null;
         } else {
+            if (wheelPlaceholderBox != null) {
+                wheelPlaceholderBox.setVisible(false);
+                wheelPlaceholderBox.setManaged(false);
+            }
             wheelPlaceholder.setVisible(false);
-            // WheelGenerator returns an empty Group until Step 4 is implemented
-            Group wheel = wheelGenerator.generateWheel(participants, WheelGenerator.DEFAULT_RADIUS);
-            wheelContainer.getChildren().add(0, wheel);
+
+            // generateWheel() returns a Group containing slices, labels, dividers
+            // AND the pointer as its last child. We pull the pointer out so it stays
+            // stationary while only the slice group rotates (Step 5).
+            Group full    = wheelGenerator.generateWheel(participants, WheelGenerator.DEFAULT_RADIUS);
+            int   lastIdx = full.getChildren().size() - 1;
+            var   pointer = full.getChildren().remove(lastIdx); // the pointer SVGPath
+            pointer.setId("wheel-pointer");
+
+            currentWheel = full; // the rotating part
+
+            // wheel first, fixed pointer on top
+            wheelContainer.getChildren().add(0, currentWheel);
+            wheelContainer.getChildren().add(pointer);
         }
     }
 
@@ -225,13 +272,47 @@ public class MainController {
         statusLabel.setText(message);
     }
 
+    // ── Per-participant remove ──────────────────────────────────────────────────
+
+    /**
+     * Removes a participant from the in-memory list and persists the delete.
+     * Called back from {@link ParticipantCell} when the × button is clicked.
+     */
+    void onRemoveParticipant(Participant p) {
+        participants.remove(p);
+        refreshWheel();
+        updateUI();
+        flashStatus("Removed \u201c" + p.getName() + "\u201d.");
+
+        if (dbManager != null && p.getId() > 0) {
+            Task<Void> deleteTask = new Task<>() {
+                @Override protected Void call() throws Exception {
+                    new NameDao(dbManager.getConnection()).delete(p.getId());
+                    return null;
+                }
+            };
+            deleteTask.setOnFailed(e ->
+                    LOG.log(Level.WARNING, "Failed to delete participant from DB", deleteTask.getException()));
+            new Thread(deleteTask, "db-delete").start();
+        }
+    }
+
+    /** Returns the currently displayed wheel Group (used by SpinAnimation in Step 5). */
+    public Group getCurrentWheel() { return currentWheel; }
+
     // ── Inner cell factory ─────────────────────────────────────────────────────
 
     /**
-     * Renders each participant as a labelled row.
-     * Step 4 will add a per-row remove button.
+     * Renders each participant as a row with a name label and a × remove button.
      */
     private static class ParticipantCell extends ListCell<Participant> {
+
+        private final MainController controller;
+
+        ParticipantCell(MainController controller) {
+            this.controller = controller;
+        }
+
         @Override
         protected void updateItem(Participant item, boolean empty) {
             super.updateItem(item, empty);
@@ -239,9 +320,24 @@ public class MainController {
                 setText(null);
                 setGraphic(null);
             } else {
-                setText(item.getName());
-                setGraphic(null);
-                // TODO Step 4: add a small × button to remove this participant
+                javafx.scene.control.Label nameLabel =
+                        new javafx.scene.control.Label(item.getName());
+                nameLabel.setMaxWidth(Double.MAX_VALUE);
+                nameLabel.getStyleClass().add("cell-name-label");
+
+                javafx.scene.control.Button removeBtn =
+                        new javafx.scene.control.Button("\u00d7");
+                removeBtn.getStyleClass().add("btn-cell-remove");
+                removeBtn.setOnAction(e -> controller.onRemoveParticipant(item));
+                removeBtn.setFocusTraversable(false);
+
+                javafx.scene.layout.HBox row = new javafx.scene.layout.HBox(nameLabel, removeBtn);
+                row.getStyleClass().add("cell-row");
+                javafx.scene.layout.HBox.setHgrow(nameLabel, javafx.scene.layout.Priority.ALWAYS);
+                row.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+
+                setText(null);
+                setGraphic(row);
             }
         }
     }

@@ -33,7 +33,13 @@
             <VBox spacing="10.0" VBox.vgrow="ALWAYS">
                 <padding><Insets top="20.0" right="22.0" bottom="16.0" left="22.0"/></padding>
 
-                <Label text="PARTICIPANTS" styleClass="section-label"/>
+                <HBox alignment="CENTER_LEFT" spacing="8.0">
+                    <Label text="PARTICIPANTS" styleClass="section-label" HBox.hgrow="ALWAYS" maxWidth="Infinity"/>
+                    <Button fx:id="loadSavedButton"
+                            text="↺ Load Saved"
+                            styleClass="btn-link"
+                            onAction="#onLoadSavedNames"/>
+                </HBox>
 
                 <HBox spacing="8.0">
                     <TextField fx:id="nameInput"

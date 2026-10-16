@@ -96,6 +96,27 @@
     -fx-scale-y: 0.97;
 }
 
+/* ── Button — Link/Action (small discreet button) ──────────────────── */
+.btn-link {
+    -fx-background-color: transparent;
+    -fx-text-fill: #818cf8;
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+    -fx-padding: 3 7;
+    -fx-cursor: hand;
+    -fx-border-radius: 4;
+    -fx-background-radius: 4;
+}
+
+.btn-link:hover {
+    -fx-background-color: rgba(99, 102, 241, 0.15);
+    -fx-text-fill: #a5b4fc;
+}
+
+.btn-link:pressed {
+    -fx-background-color: rgba(99, 102, 241, 0.28);
+}
+
 /* ── Button — Secondary (ghost) ───────────────────────────────────── */
 .btn-secondary {
     -fx-background-color: #1f2937;
@@ -223,6 +244,48 @@
     -fx-text-fill: #6b7280;
     -fx-font-size: 12px;
     -fx-padding: 2 0;
+}
+
+/* ── Cell row (name label + × button) ────────────────────────────── */
+.cell-row {
+    -fx-spacing: 6;
+    -fx-padding: 0 4 0 0;
+    -fx-alignment: CENTER_LEFT;
+}
+
+.cell-name-label {
+    -fx-text-fill: #d1d5db;
+    -fx-font-size: 14px;
+}
+
+/* × remove button inside each list cell */
+.btn-cell-remove {
+    -fx-background-color: transparent;
+    -fx-text-fill: #4b5563;
+    -fx-font-size: 15px;
+    -fx-font-weight: bold;
+    -fx-padding: 0 4;
+    -fx-cursor: hand;
+    -fx-border-radius: 4;
+    -fx-background-radius: 4;
+    -fx-min-width: 22;
+    -fx-min-height: 22;
+    -fx-pref-width: 22;
+    -fx-pref-height: 22;
+}
+
+.btn-cell-remove:hover {
+    -fx-background-color: rgba(239,68,68,0.15);
+    -fx-text-fill: #ef4444;
+}
+
+.btn-cell-remove:pressed {
+    -fx-background-color: rgba(239,68,68,0.3);
+}
+
+/* Ensure the selected cell's name label stays readable */
+.participant-list .list-cell:selected .cell-name-label {
+    -fx-text-fill: #e9d5ff;
 }
 
 /* ── Center wheel canvas ──────────────────────────────────────────── */
