@@ -5,12 +5,16 @@ import com.example.db.DatabaseManager;
 import com.example.db.NameDao;
 import com.example.model.Participant;
 import com.example.svg.WheelGenerator;
+import com.example.anim.SpinAnimation;
+import javafx.animation.RotateTransition;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.concurrent.Task;
 import javafx.fxml.FXML;
+import javafx.scene.Cursor;
 import javafx.scene.Group;
+import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
@@ -19,6 +23,7 @@ import javafx.scene.control.TextField;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 
+import java.security.SecureRandom;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.logging.Level;
@@ -63,12 +68,25 @@ public class MainController {
             FXCollections.observableArrayList();
 
     private final WheelGenerator wheelGenerator = new WheelGenerator();
+    private final SpinAnimation  spinAnimation  = new SpinAnimation();
 
     /**
      * The rotating slice {@link Group} most recently built by {@link #refreshWheel()}.
-     * Step 5 reads this to apply the {@link com.example.anim.SpinAnimation}.
+     * Step 5 reads this to apply the {@link SpinAnimation}.
      */
     private Group currentWheel;
+
+    /** The pointer node placed on top of the wheel. */
+    private Node currentPointerNode;
+
+    /** Active pointer wobble animation during spin. */
+    private RotateTransition pointerWobble;
+
+    /** Flag indicating a spin is currently in progress. */
+    private boolean isSpinning = false;
+
+    /** The participant pre-selected as the winner of the current/last spin. */
+    private Participant currentWinner;
 
     /** Injected by {@code App.start()} after FXML loading. May be null if DB failed to open. */
     private DatabaseManager dbManager;
@@ -100,6 +118,13 @@ public class MainController {
         // Allow pressing Enter in the text field to add a name
         nameInput.setOnAction(e -> onAddName());
 
+        // Trigger the spin by clicking directly on the wheel container
+        wheelContainer.setOnMouseClicked(e -> {
+            if (!isSpinning && participants.size() >= 2) {
+                onSpin();
+            }
+        });
+
         updateUI();
     }
 
@@ -107,6 +132,9 @@ public class MainController {
 
     @FXML
     private void onAddName() {
+        if (isSpinning) {
+            return;
+        }
         String raw  = nameInput.getText();
         String name = (raw == null) ? "" : raw.trim();
 
@@ -147,6 +175,9 @@ public class MainController {
 
     @FXML
     private void onClearAll() {
+        if (isSpinning) {
+            return;
+        }
         participants.clear();
         statusLabel.setText("");
         refreshWheel();
@@ -167,6 +198,9 @@ public class MainController {
 
     @FXML
     private void onLoadSavedNames() {
+        if (isSpinning) {
+            return;
+        }
         if (dbManager != null && dbManager.getConnection() != null) {
             flashStatus("Loading saved participants…");
             loadNamesFromDb();
@@ -177,14 +211,63 @@ public class MainController {
 
     @FXML
     private void onSpin() {
+        if (isSpinning) {
+            return;
+        }
         if (participants.size() < 2) {
             flashStatus("Need at least 2 participants to spin.");
             return;
         }
-        flashStatus("Spinning… (full animation arrives in Step 5)");
-        // TODO Step 5: pick winner, compute targetAngle, run SpinAnimation
-        // TODO Step 6: on spin finish, run HitAnimation, show ban dialog
-        // TODO Step 7: ban() in NameDao, redraw wheel
+        if (currentWheel == null) {
+            return;
+        }
+
+        isSpinning = true;
+        setUiSpinningState(true);
+
+        // 1. Fair pre-selection of winner (testable, independent of animation physics)
+        SecureRandom random = new SecureRandom();
+        int winnerIndex = SpinAnimation.pickRandomWinner(participants.size(), random);
+        currentWinner = participants.get(winnerIndex);
+
+        // 2. Random offset within ±40% of slice angle for natural stopping variation
+        double offsetFactor = (random.nextDouble() * 2.0) - 1.0; // [-1.0, 1.0]
+        double offset = SpinAnimation.computeRandomOffset(participants.size(), offsetFactor);
+        int fullSpins = 5 + random.nextInt(3); // 5 to 7 full revolutions
+
+        // 3. Compute target angle guaranteeing forward rotation and exact landing
+        double targetAngle = SpinAnimation.computeTargetAngle(
+                currentWheel.getRotate(), winnerIndex, participants.size(), fullSpins, offset);
+
+        flashStatus("Spinning the wheel…");
+        bottomStatus.setText("Spinning… good luck!");
+
+        // 4. Subtle pointer wobble while spinning
+        if (currentPointerNode != null) {
+            pointerWobble = SpinAnimation.buildPointerWobble(currentPointerNode);
+            pointerWobble.play();
+        }
+
+        // 5. RotateTransition on wheel group (4-8s, Interpolator.EASE_OUT)
+        RotateTransition rt = spinAnimation.buildSpin(currentWheel, targetAngle, () -> {
+            if (pointerWobble != null) {
+                pointerWobble.stop();
+                if (currentPointerNode != null) {
+                    currentPointerNode.setRotate(0);
+                }
+            }
+            isSpinning = false;
+            setUiSpinningState(false);
+            updateUI();
+
+            flashStatus("🎯 Selected: " + currentWinner.getName() + "!");
+            bottomStatus.setText("Landed on " + currentWinner.getName() + " · ready for Step 6 hammer hit");
+
+            // TODO Step 6: run HitAnimation and show ban dialog
+            // TODO Step 7: ban() in NameDao, redraw wheel
+        });
+
+        rt.play();
     }
 
     // ── Private helpers ────────────────────────────────────────────────────────
@@ -248,16 +331,20 @@ public class MainController {
             pointer.setId("wheel-pointer");
 
             currentWheel = full; // the rotating part
+            currentWheel.setCursor(Cursor.HAND);
+            currentPointerNode = pointer;
 
             // wheel first, fixed pointer on top
             wheelContainer.getChildren().add(0, currentWheel);
             wheelContainer.getChildren().add(pointer);
         }
+        wheelContainer.setCursor(participants.size() >= 2 ? Cursor.HAND : Cursor.DEFAULT);
     }
 
     private void updateUI() {
         int n = participants.size();
-        spinButton.setDisable(n < 2);
+        spinButton.setDisable(isSpinning || n < 2);
+        wheelContainer.setCursor(isSpinning ? Cursor.WAIT : (n >= 2 ? Cursor.HAND : Cursor.DEFAULT));
 
         if (n == 0) {
             bottomStatus.setText("Ready — add names to get started");
@@ -266,6 +353,18 @@ public class MainController {
         } else {
             bottomStatus.setText(n + " participant" + (n == 1 ? "" : "s") + " · click ⚡ Spin! to begin");
         }
+    }
+
+    private void setUiSpinningState(boolean spinning) {
+        nameInput.setDisable(spinning);
+        addButton.setDisable(spinning);
+        clearButton.setDisable(spinning);
+        if (loadSavedButton != null) {
+            loadSavedButton.setDisable(spinning);
+        }
+        spinButton.setDisable(spinning || participants.size() < 2);
+        participantList.setDisable(spinning);
+        wheelContainer.setCursor(spinning ? Cursor.WAIT : (participants.size() >= 2 ? Cursor.HAND : Cursor.DEFAULT));
     }
 
     private void flashStatus(String message) {
@@ -279,6 +378,9 @@ public class MainController {
      * Called back from {@link ParticipantCell} when the × button is clicked.
      */
     void onRemoveParticipant(Participant p) {
+        if (isSpinning) {
+            return;
+        }
         participants.remove(p);
         refreshWheel();
         updateUI();
@@ -299,6 +401,12 @@ public class MainController {
 
     /** Returns the currently displayed wheel Group (used by SpinAnimation in Step 5). */
     public Group getCurrentWheel() { return currentWheel; }
+
+    /** Returns whether a spin animation is currently active. */
+    public boolean isSpinning() { return isSpinning; }
+
+    /** Returns the pre-selected winner of the most recent spin. */
+    public Participant getCurrentWinner() { return currentWinner; }
 
     // ── Inner cell factory ─────────────────────────────────────────────────────
 

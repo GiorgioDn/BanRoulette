@@ -8,7 +8,9 @@ module com.example {
     opens com.example.ui  to javafx.fxml;
 
     // Public API
+    exports com.example.anim;
     exports com.example.app;
     exports com.example.db;
     exports com.example.model;
+    exports com.example.svg;
 }
