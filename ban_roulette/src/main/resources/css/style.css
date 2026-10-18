@@ -324,3 +324,68 @@
     -fx-text-fill: #6b7280;
     -fx-font-size: 12px;
 }
+
+/* ── Ban Result Dialog Overlay (Step 6) ───────────────────────────── */
+.ban-dialog-overlay {
+    -fx-background-color: rgba(11, 17, 32, 0.78);
+    -fx-alignment: center;
+}
+
+.ban-dialog-card {
+    -fx-background-color: #111827;
+    -fx-border-color: #ef4444;
+    -fx-border-width: 1.5;
+    -fx-border-radius: 14;
+    -fx-background-radius: 14;
+    -fx-effect: dropshadow(gaussian, rgba(239, 68, 68, 0.5), 36, 0, 0, 0);
+}
+
+.ban-dialog-badge {
+    -fx-background-color: rgba(239, 68, 68, 0.15);
+    -fx-background-radius: 30;
+    -fx-min-width: 60;
+    -fx-min-height: 60;
+    -fx-max-width: 60;
+    -fx-max-height: 60;
+    -fx-alignment: center;
+}
+
+.ban-dialog-icon {
+    -fx-font-size: 28px;
+}
+
+.ban-dialog-subtitle {
+    -fx-text-fill: #ef4444;
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+}
+
+.ban-dialog-title {
+    -fx-text-fill: #ffffff;
+    -fx-font-size: 20px;
+    -fx-font-weight: bold;
+}
+
+.btn-ban-dismiss {
+    -fx-background-color: linear-gradient(to right, #ef4444, #dc2626);
+    -fx-text-fill: #ffffff;
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-padding: 9 26;
+    -fx-border-radius: 7;
+    -fx-background-radius: 7;
+    -fx-cursor: hand;
+}
+
+.btn-ban-dismiss:hover {
+    -fx-background-color: linear-gradient(to right, #dc2626, #b91c1c);
+    -fx-effect: dropshadow(gaussian, rgba(239, 68, 68, 0.55), 14, 0, 0, 0);
+    -fx-scale-x: 1.03;
+    -fx-scale-y: 1.03;
+}
+
+.btn-ban-dismiss:pressed {
+    -fx-scale-x: 0.97;
+    -fx-scale-y: 0.97;
+}
+

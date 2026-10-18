@@ -97,6 +97,38 @@
                        textAlignment="CENTER"
                        wrapText="true"/>
             </VBox>
+
+            <!-- ══ BAN RESULT OVERLAY DIALOG (Step 6) ═════════════════════ -->
+            <StackPane fx:id="banDialogOverlay"
+                       styleClass="ban-dialog-overlay"
+                       visible="false"
+                       managed="false">
+                <VBox styleClass="ban-dialog-card"
+                      alignment="CENTER"
+                      spacing="16.0"
+                      maxWidth="420.0"
+                      maxHeight="300.0">
+                    <padding><Insets top="28.0" right="32.0" bottom="28.0" left="32.0"/></padding>
+
+                    <StackPane styleClass="ban-dialog-badge">
+                        <Label text="🔨" styleClass="ban-dialog-icon"/>
+                    </StackPane>
+
+                    <VBox alignment="CENTER" spacing="6.0">
+                        <Label text="BAN HAMMER HAS SPOKEN" styleClass="ban-dialog-subtitle"/>
+                        <Label fx:id="banDialogMessage"
+                               text="Player has been banned!"
+                               styleClass="ban-dialog-title"
+                               wrapText="true"
+                               textAlignment="CENTER"/>
+                    </VBox>
+
+                    <Button fx:id="banDialogDismissBtn"
+                            text="Dismiss"
+                            styleClass="btn-ban-dismiss"
+                            onAction="#onDismissBanDialog"/>
+                </VBox>
+            </StackPane>
         </StackPane>
     </center>
 

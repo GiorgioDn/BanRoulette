@@ -5,8 +5,12 @@ import com.example.db.DatabaseManager;
 import com.example.db.NameDao;
 import com.example.model.Participant;
 import com.example.svg.WheelGenerator;
+import com.example.anim.HitAnimation;
 import com.example.anim.SpinAnimation;
+import com.example.svg.HammerLoader;
+import javafx.animation.FadeTransition;
 import javafx.animation.RotateTransition;
+import javafx.animation.SequentialTransition;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -22,6 +26,7 @@ import javafx.scene.control.ListView;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.util.Duration;
 
 import java.security.SecureRandom;
 import java.sql.SQLException;
@@ -62,6 +67,11 @@ public class MainController {
     @FXML private Label      statusLabel;
     @FXML private Label      bottomStatus;
 
+    // Ban dialog overlay nodes (Step 6)
+    @FXML private StackPane  banDialogOverlay;
+    @FXML private Label      banDialogMessage;
+    @FXML private Button     banDialogDismissBtn;
+
     // ── State ─────────────────────────────────────────────────────────────────
 
     private final ObservableList<Participant> participants =
@@ -69,6 +79,8 @@ public class MainController {
 
     private final WheelGenerator wheelGenerator = new WheelGenerator();
     private final SpinAnimation  spinAnimation  = new SpinAnimation();
+    private final HitAnimation   hitAnimation   = new HitAnimation();
+    private final HammerLoader   hammerLoader   = new HammerLoader();
 
     /**
      * The rotating slice {@link Group} most recently built by {@link #refreshWheel()}.
@@ -256,18 +268,45 @@ public class MainController {
                     currentPointerNode.setRotate(0);
                 }
             }
-            isSpinning = false;
-            setUiSpinningState(false);
-            updateUI();
 
-            flashStatus("🎯 Selected: " + currentWinner.getName() + "!");
-            bottomStatus.setText("Landed on " + currentWinner.getName() + " · ready for Step 6 hammer hit");
+            flashStatus("⚡ Ban hammer incoming for " + currentWinner.getName() + "…");
+            bottomStatus.setText("Hammer strike incoming…");
 
-            // TODO Step 6: run HitAnimation and show ban dialog
-            // TODO Step 7: ban() in NameDao, redraw wheel
+            // Step 6: Trigger the ban hammer hit sequence
+            playHammerHitAnimation(currentWinner);
         });
 
         rt.play();
+    }
+
+    /**
+     * Executes Step 6: loads the hammer SVG, places it above the winning slice,
+     * runs the wind-up -> strike -> impact shake -> retreat sequence, and shows
+     * the result dialog on completion.
+     */
+    void playHammerHitAnimation(Participant winner) {
+        Group hammer = hammerLoader.loadHammer();
+        // Position hammer above-right of the 12 o'clock pointer so the strike swings into the slice
+        hammer.setTranslateX(110.0);
+        hammer.setTranslateY(-380.0);
+
+        // Add above wheel/pointer but behind the dialog overlay
+        int overlayIdx = (banDialogOverlay != null)
+                ? wheelContainer.getChildren().indexOf(banDialogOverlay) : -1;
+        if (overlayIdx >= 0) {
+            wheelContainer.getChildren().add(overlayIdx, hammer);
+        } else {
+            wheelContainer.getChildren().add(hammer);
+        }
+
+        SequentialTransition hit = hitAnimation.buildHit(hammer, currentWheel, () -> {
+            wheelContainer.getChildren().remove(hammer);
+            showBanDialog(winner.getName());
+            flashStatus("🔨 " + winner.getName() + " has been struck!");
+            bottomStatus.setText("Banned: " + winner.getName() + " · ban hammer has spoken");
+        });
+
+        hit.play();
     }
 
     // ── Private helpers ────────────────────────────────────────────────────────
@@ -338,6 +377,9 @@ public class MainController {
             wheelContainer.getChildren().add(0, currentWheel);
             wheelContainer.getChildren().add(pointer);
         }
+        if (banDialogOverlay != null) {
+            banDialogOverlay.toFront();
+        }
         wheelContainer.setCursor(participants.size() >= 2 ? Cursor.HAND : Cursor.DEFAULT);
     }
 
@@ -407,6 +449,64 @@ public class MainController {
 
     /** Returns the pre-selected winner of the most recent spin. */
     public Participant getCurrentWinner() { return currentWinner; }
+
+    // ── Ban dialog display & dismiss (Step 6) ──────────────────────────────────
+
+    /**
+     * Displays the result dialog overlay announcing the banned participant.
+     */
+    public void showBanDialog(String name) {
+        if (banDialogMessage != null) {
+            banDialogMessage.setText(name + " has been banned!");
+        }
+        if (banDialogOverlay != null) {
+            banDialogOverlay.setOpacity(0.0);
+            banDialogOverlay.setVisible(true);
+            banDialogOverlay.setManaged(true);
+            banDialogOverlay.toFront();
+
+            FadeTransition fadeIn = new FadeTransition(Duration.millis(200), banDialogOverlay);
+            fadeIn.setToValue(1.0);
+            fadeIn.play();
+        } else {
+            isSpinning = false;
+            setUiSpinningState(false);
+            updateUI();
+        }
+    }
+
+    /**
+     * Dismisses the ban result dialog and unlocks the UI controls.
+     */
+    @FXML
+    public void onDismissBanDialog() {
+        if (banDialogOverlay != null) {
+            FadeTransition fadeOut = new FadeTransition(Duration.millis(150), banDialogOverlay);
+            fadeOut.setToValue(0.0);
+            fadeOut.setOnFinished(e -> {
+                banDialogOverlay.setVisible(false);
+                banDialogOverlay.setManaged(false);
+                isSpinning = false;
+                setUiSpinningState(false);
+                updateUI();
+            });
+            fadeOut.play();
+        } else {
+            isSpinning = false;
+            setUiSpinningState(false);
+            updateUI();
+        }
+    }
+
+    /** Returns whether the ban dialog overlay is currently displayed. */
+    public boolean isBanDialogVisible() {
+        return banDialogOverlay != null && banDialogOverlay.isVisible();
+    }
+
+    /** Returns the text currently displayed in the ban dialog. */
+    public String getBanDialogMessageText() {
+        return (banDialogMessage != null) ? banDialogMessage.getText() : "";
+    }
 
     // ── Inner cell factory ─────────────────────────────────────────────────────
 
