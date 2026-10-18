@@ -5,6 +5,8 @@
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.ListView?>
 <?import javafx.scene.control.Separator?>
+<?import javafx.scene.control.TableColumn?>
+<?import javafx.scene.control.TableView?>
 <?import javafx.scene.control.TextField?>
 <?import javafx.scene.layout.BorderPane?>
 <?import javafx.scene.layout.HBox?>
@@ -14,7 +16,7 @@
 <BorderPane xmlns="http://javafx.com/javafx/21"
             xmlns:fx="http://javafx.com/fxml/1"
             fx:controller="com.example.ui.MainController"
-            prefHeight="720.0" prefWidth="1120.0">
+            prefHeight="740.0" prefWidth="1200.0">
 
     <!-- ══ LEFT SIDEBAR ══════════════════════════════════════════════ -->
     <left>
@@ -132,6 +134,57 @@
         </StackPane>
     </center>
 
+    <!-- ══ RIGHT SIDEBAR — BANNED LIST (Step 7) ══════════════════════ -->
+    <right>
+        <VBox fx:id="rightSidebar" styleClass="sidebar-right" prefWidth="320.0">
+            <!-- Brand / Header -->
+            <VBox styleClass="sidebar-header" spacing="4.0">
+                <padding><Insets top="28.0" right="20.0" bottom="20.0" left="20.0"/></padding>
+                <HBox alignment="CENTER_LEFT" spacing="8.0">
+                    <Label text="📜  BANNED LIST" styleClass="section-label" HBox.hgrow="ALWAYS" maxWidth="Infinity"/>
+                    <Label fx:id="bannedCountBadge" text="0" styleClass="badge-count"/>
+                </HBox>
+                <Label text="Fallen participants removed by the hammer" styleClass="app-subtitle"/>
+            </VBox>
+
+            <Separator styleClass="sidebar-sep"/>
+
+            <!-- Banned TableView (grows to fill height) -->
+            <VBox spacing="10.0" VBox.vgrow="ALWAYS">
+                <padding><Insets top="16.0" right="20.0" bottom="16.0" left="20.0"/></padding>
+
+                <TableView fx:id="bannedTable"
+                           styleClass="banned-table"
+                           VBox.vgrow="ALWAYS">
+                    <columns>
+                        <TableColumn fx:id="bannedNameCol"
+                                     text="Name"
+                                     prefWidth="110.0"/>
+                        <TableColumn fx:id="bannedDateCol"
+                                     text="Date"
+                                     prefWidth="85.0"/>
+                        <TableColumn fx:id="bannedActionCol"
+                                     text="Action"
+                                     prefWidth="75.0"/>
+                    </columns>
+                    <placeholder>
+                        <Label text="No banned participants yet" styleClass="table-placeholder"/>
+                    </placeholder>
+                </TableView>
+            </VBox>
+
+            <!-- Bottom actions for right sidebar -->
+            <VBox styleClass="sidebar-actions" spacing="8.0">
+                <padding><Insets top="10.0" right="20.0" bottom="20.0" left="20.0"/></padding>
+                <Button fx:id="clearBannedBtn"
+                        text="Clear History"
+                        styleClass="btn-secondary"
+                        onAction="#onClearBannedHistory"
+                        maxWidth="Infinity"/>
+            </VBox>
+        </VBox>
+    </right>
+
     <!-- ══ BOTTOM STATUS BAR ════════════════════════════════════════ -->
     <bottom>
         <HBox styleClass="status-bar" alignment="CENTER_LEFT" spacing="10.0">
@@ -139,7 +192,13 @@
             <Label text="●" styleClass="status-dot"/>
             <Label fx:id="bottomStatus"
                    text="Ready — add names to get started"
-                   styleClass="status-bar-text"/>
+                   styleClass="status-bar-text"
+                   HBox.hgrow="ALWAYS"
+                   maxWidth="Infinity"/>
+            <Button fx:id="toggleHistoryBtn"
+                    text="📜 History"
+                    styleClass="btn-link"
+                    onAction="#onToggleHistory"/>
         </HBox>
     </bottom>
 

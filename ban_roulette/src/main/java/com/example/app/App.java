@@ -69,8 +69,8 @@ public class App extends Application {
         }
 
         stage.setTitle("Ban Roulette");
-        stage.setMinWidth(820);
-        stage.setMinHeight(560);
+        stage.setMinWidth(960);
+        stage.setMinHeight(600);
         stage.setScene(scene);
         stage.show();
     }

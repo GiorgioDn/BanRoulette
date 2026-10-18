@@ -102,4 +102,52 @@ class BannedDaoTest {
         assertDoesNotThrow(() -> bannedDao.delete(99_999L),
                 "Deleting a non-existent id should be a silent no-op");
     }
+
+    // ── restore (transactional move back to names) ────────────────────────────
+
+    @Test
+    @Order(8)
+    void restoreMovesBannedNameToNamesTable() throws SQLException {
+        NameDao nameDao = new NameDao(db.getConnection());
+        nameDao.deleteAll();
+
+        long id = bannedDao.insert("Judy");
+        assertEquals(1, bannedDao.count());
+
+        com.example.model.Participant restored = bannedDao.restore(id, nameDao);
+        assertNotNull(restored);
+        assertEquals("Judy", restored.getName());
+        assertTrue(restored.getId() > 0);
+
+        // Should be removed from banned_names
+        assertEquals(0, bannedDao.count());
+        assertTrue(bannedDao.findAll().isEmpty());
+
+        // Should be present in names
+        List<com.example.model.Participant> participants = nameDao.findAll();
+        assertEquals(1, participants.size());
+        assertEquals("Judy", participants.get(0).getName());
+    }
+
+    @Test
+    @Order(9)
+    void restoreNonExistentIdThrows() {
+        NameDao nameDao = new NameDao(db.getConnection());
+        assertThrows(SQLException.class, () -> bannedDao.restore(99_999L, nameDao),
+                "Restoring a non-existent banned id should throw SQLException");
+    }
+
+    // ── deleteAll ──────────────────────────────────────────────────────────────
+
+    @Test
+    @Order(10)
+    void deleteAllClearsAllBannedNames() throws SQLException {
+        bannedDao.insert("Ban1");
+        bannedDao.insert("Ban2");
+        assertEquals(2, bannedDao.count());
+
+        bannedDao.deleteAll();
+        assertEquals(0, bannedDao.count());
+        assertTrue(bannedDao.findAll().isEmpty());
+    }
 }

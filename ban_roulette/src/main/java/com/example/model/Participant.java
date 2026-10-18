@@ -17,6 +17,13 @@ public class Participant {
         this.name = name;
     }
 
+    /** Constructor with id and name. */
+    public Participant(long id, String name) {
+        this.id = id;
+        this.name = name;
+        this.createdAt = LocalDateTime.now();
+    }
+
     /** Full constructor for DB-backed rows. */
     public Participant(long id, String name, LocalDateTime createdAt) {
         this.id = id;
