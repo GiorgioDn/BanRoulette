@@ -81,6 +81,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Extract project version from pom.xml
+        id: get_version
+        shell: bash
+        run: |
+          VERSION=$(grep -m 1 '<version>' ban_roulette/pom.xml | sed -E 's/.*<version>(.*)<\/version>.*/\1/' | tr -d '[:space:]')
+          echo "VERSION=${VERSION}" >> "$GITHUB_OUTPUT"
+
       - name: Download all installers
         uses: actions/download-artifact@v4
         with:
@@ -90,10 +97,16 @@ jobs:
       - name: Create / update GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: build-${{ github.run_number }}
-          name: "Build #${{ github.run_number }} (${{ github.sha }})"
+          tag_name: v${{ steps.get_version.outputs.VERSION }}
+          name: "Ban Roulette v${{ steps.get_version.outputs.VERSION }}"
           body: |
-            Automated build from commit `${{ github.sha }}`.
+            Release of **Ban Roulette v${{ steps.get_version.outputs.VERSION }}**.
+            Commit: `${{ github.sha }}`
+
+            ### Installers
+            - **macOS**: `BanRoulette-macos.pkg`
+            - **Windows**: `BanRoulette-windows.exe`
+            - **Linux**: `BanRoulette-linux.deb`
 
             > ⚠️ **Unsigned installers** – macOS Gatekeeper and Windows SmartScreen
             > will warn on first launch. Right-click → Open to bypass on macOS.

@@ -9,10 +9,19 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="${SCRIPT_DIR}/../ban_roulette"
 INPUT_DIR="${PROJECT_DIR}/target/jpackage-input"
 OUTPUT_DIR="${PROJECT_DIR}/target/installer"
-MAIN_JAR="ban_roulette-1.0.0.jar"
 MAIN_CLASS="com.example.app.AppLauncher"
 APP_NAME="BanRoulette"
-APP_VERSION="1.0.0"
+
+# Auto-detect built jar and version from jpackage-input
+JAR_PATH=$(find "${INPUT_DIR}" -maxdepth 1 -name "ban_roulette-*.jar" 2>/dev/null | head -n 1 || true)
+if [[ -n "${JAR_PATH}" ]]; then
+    MAIN_JAR="$(basename "${JAR_PATH}")"
+    APP_VERSION="${MAIN_JAR#ban_roulette-}"
+    APP_VERSION="${APP_VERSION%.jar}"
+else
+    MAIN_JAR="ban_roulette-1.0.0.jar"
+    APP_VERSION="1.0.0"
+fi
 
 # Detect OS
 OS="$(uname -s)"

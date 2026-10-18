@@ -22,6 +22,7 @@ import javafx.geometry.Pos;
 import javafx.scene.Cursor;
 import javafx.scene.Group;
 import javafx.scene.Node;
+import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
@@ -30,15 +31,16 @@ import javafx.scene.control.TableCell;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
+import javafx.scene.control.Tooltip;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.util.Duration;
 
+import java.net.URL;
 import java.security.SecureRandom;
 import java.sql.Connection;
-import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -51,11 +53,12 @@ import java.util.logging.Logger;
  * <p>Responsibilities:
  * <ul>
  *   <li>Manage participants for the roulette wheel.</li>
- *   <li>When a participant is chosen by the roulette for a ban:
- *       record/increment their count in {@code banned_names} in H2 without deleting them
- *       from the active names list or wheel.</li>
+ *   <li>Dynamically scale the wheel, pointer, and hammer with window resizing.</li>
+ *   <li>Keyboard shortcuts for spinning (Space, Ctrl+Enter / Cmd+Enter).</li>
+ *   <li>When a participant is chosen for a ban: record/increment their count in {@code banned_names}
+ *       without deleting them from the active names list or wheel.</li>
  *   <li>Display both the names used and the banned names with their cumulative count.</li>
- *   <li>Persist participant additions/deletions and ban counts via background tasks.</li>
+ *   <li>User-facing alerts for database failures and graceful in-memory fallbacks.</li>
  * </ul>
  */
 public class MainController {
@@ -106,6 +109,11 @@ public class MainController {
     private final HammerLoader   hammerLoader   = new HammerLoader();
 
     /**
+     * Group wrapper holding wheel, pointer, and hammer for responsive proportional scaling.
+     */
+    private Group wheelScaleGroup;
+
+    /**
      * The rotating slice {@link Group} most recently built by {@link #refreshWheel()}.
      */
     private Group currentWheel;
@@ -149,6 +157,15 @@ public class MainController {
         participantList.setItems(participants);
         // Pass 'this' so the cell can display ban count badge and handle remove
         participantList.setCellFactory(lv -> new ParticipantCell(this));
+
+        // Tooltip with keyboard shortcut hint
+        if (spinButton != null) {
+            spinButton.setTooltip(new Tooltip("Spin the wheel (Space / ⌘+Enter)"));
+        }
+
+        // Responsive wheel scaling when center container resizes
+        wheelContainer.widthProperty().addListener((obs, oldW, newW) -> updateWheelScale());
+        wheelContainer.heightProperty().addListener((obs, oldH, newH) -> updateWheelScale());
 
         // Configure Banned TableView (Step 7)
         if (bannedTable != null) {
@@ -225,6 +242,29 @@ public class MainController {
         updateUI();
     }
 
+    /**
+     * Dynamically scales the wheel, pointer, and hammer group to fit inside the wheel container.
+     */
+    public void updateWheelScale() {
+        if (wheelScaleGroup == null || wheelContainer == null) return;
+        double w = wheelContainer.getWidth();
+        double h = wheelContainer.getHeight();
+        if (w <= 0 || h <= 0) return;
+        double available = Math.min(w - 40.0, h - 40.0);
+        double factor = Math.max(0.45, Math.min(1.4, available / 640.0));
+        wheelScaleGroup.setScaleX(factor);
+        wheelScaleGroup.setScaleY(factor);
+    }
+
+    /**
+     * Triggered by keyboard shortcuts (Space, Ctrl+Enter / Cmd+Enter).
+     */
+    public void triggerSpinFromShortcut() {
+        if (!isSpinning && participants.size() >= 2) {
+            onSpin();
+        }
+    }
+
     // ── Event handlers ─────────────────────────────────────────────────────────
 
     @FXML
@@ -264,8 +304,10 @@ public class MainController {
                 }
             };
             insertTask.setOnSucceeded(e -> p.setId(insertTask.getValue()));
-            insertTask.setOnFailed(e ->
-                    LOG.log(Level.WARNING, "Failed to persist participant", insertTask.getException()));
+            insertTask.setOnFailed(e -> {
+                LOG.log(Level.WARNING, "Failed to persist participant", insertTask.getException());
+                showDbErrorAlert("Add Participant", insertTask.getException());
+            });
             new Thread(insertTask, "db-insert").start();
         }
     }
@@ -287,8 +329,10 @@ public class MainController {
                     return null;
                 }
             };
-            clearTask.setOnFailed(e ->
-                    LOG.log(Level.WARNING, "Failed to clear participants in DB", clearTask.getException()));
+            clearTask.setOnFailed(e -> {
+                LOG.log(Level.WARNING, "Failed to clear participants in DB", clearTask.getException());
+                showDbErrorAlert("Clear All Participants", clearTask.getException());
+            });
             new Thread(clearTask, "db-clear").start();
         }
     }
@@ -374,16 +418,18 @@ public class MainController {
         hammer.setTranslateX(110.0);
         hammer.setTranslateY(-380.0);
 
-        int overlayIdx = (banDialogOverlay != null)
-                ? wheelContainer.getChildren().indexOf(banDialogOverlay) : -1;
-        if (overlayIdx >= 0) {
-            wheelContainer.getChildren().add(overlayIdx, hammer);
+        if (wheelScaleGroup != null) {
+            wheelScaleGroup.getChildren().add(hammer);
         } else {
             wheelContainer.getChildren().add(hammer);
         }
 
         SequentialTransition hit = hitAnimation.buildHit(hammer, currentWheel, () -> {
-            wheelContainer.getChildren().remove(hammer);
+            if (wheelScaleGroup != null) {
+                wheelScaleGroup.getChildren().remove(hammer);
+            } else {
+                wheelContainer.getChildren().remove(hammer);
+            }
 
             // Record the ban without deleting from participants or names table
             if (dbManager != null && dbManager.getConnection() != null) {
@@ -405,6 +451,7 @@ public class MainController {
                     int count = updateInMemoryBan(winner.getName());
                     participantList.refresh();
                     showBanDialog(winner.getName(), count);
+                    showDbErrorAlert("Record Ban", banTask.getException());
                 });
                 new Thread(banTask, "db-ban").start();
             } else {
@@ -484,8 +531,10 @@ public class MainController {
             });
         });
 
-        loadTask.setOnFailed(e ->
-                LOG.log(Level.WARNING, "Failed to load participants from DB", loadTask.getException()));
+        loadTask.setOnFailed(e -> {
+            LOG.log(Level.WARNING, "Failed to load participants from DB", loadTask.getException());
+            showDbErrorAlert("Load Participants", loadTask.getException());
+        });
 
         new Thread(loadTask, "db-load").start();
     }
@@ -512,15 +561,17 @@ public class MainController {
             });
         });
 
-        loadTask.setOnFailed(e ->
-                LOG.log(Level.WARNING, "Failed to load banned names from DB", loadTask.getException()));
+        loadTask.setOnFailed(e -> {
+            LOG.log(Level.WARNING, "Failed to load banned names from DB", loadTask.getException());
+            showDbErrorAlert("Load Banned History", loadTask.getException());
+        });
 
         new Thread(loadTask, "db-load-banned").start();
     }
 
     private void refreshWheel() {
         wheelContainer.getChildren().removeIf(
-                n -> n instanceof Group || "wheel-pointer".equals(n.getId()));
+                n -> n instanceof Group || "wheel-pointer".equals(n.getId()) || "wheel-scale-group".equals(n.getId()));
 
         if (participants.size() < 2) {
             if (wheelPlaceholderBox != null) {
@@ -529,6 +580,7 @@ public class MainController {
             }
             wheelPlaceholder.setVisible(true);
             currentWheel = null;
+            wheelScaleGroup = null;
         } else {
             if (wheelPlaceholderBox != null) {
                 wheelPlaceholderBox.setVisible(false);
@@ -545,8 +597,17 @@ public class MainController {
             currentWheel.setCursor(Cursor.HAND);
             currentPointerNode = pointer;
 
-            wheelContainer.getChildren().add(0, currentWheel);
-            wheelContainer.getChildren().add(pointer);
+            wheelScaleGroup = new Group(currentWheel, pointer);
+            wheelScaleGroup.setId("wheel-scale-group");
+
+            int overlayIdx = (banDialogOverlay != null)
+                    ? wheelContainer.getChildren().indexOf(banDialogOverlay) : -1;
+            if (overlayIdx >= 0) {
+                wheelContainer.getChildren().add(overlayIdx, wheelScaleGroup);
+            } else {
+                wheelContainer.getChildren().add(0, wheelScaleGroup);
+            }
+            updateWheelScale();
         }
         if (banDialogOverlay != null) {
             banDialogOverlay.toFront();
@@ -612,8 +673,10 @@ public class MainController {
                     return null;
                 }
             };
-            deleteTask.setOnFailed(e ->
-                    LOG.log(Level.WARNING, "Failed to delete participant from DB", deleteTask.getException()));
+            deleteTask.setOnFailed(e -> {
+                LOG.log(Level.WARNING, "Failed to delete participant from DB", deleteTask.getException());
+                showDbErrorAlert("Remove Participant", deleteTask.getException());
+            });
             new Thread(deleteTask, "db-delete").start();
         }
     }
@@ -656,8 +719,10 @@ public class MainController {
                     return null;
                 }
             };
-            deleteTask.setOnFailed(e ->
-                    LOG.log(Level.WARNING, "Failed to reset ban in DB", deleteTask.getException()));
+            deleteTask.setOnFailed(e -> {
+                LOG.log(Level.WARNING, "Failed to reset ban in DB", deleteTask.getException());
+                showDbErrorAlert("Reset Ban Count", deleteTask.getException());
+            });
             new Thread(deleteTask, "db-delete-banned").start();
         }
     }
@@ -681,8 +746,10 @@ public class MainController {
                     return null;
                 }
             };
-            clearTask.setOnFailed(e ->
-                    LOG.log(Level.WARNING, "Failed to clear banned history in DB", clearTask.getException()));
+            clearTask.setOnFailed(e -> {
+                LOG.log(Level.WARNING, "Failed to clear banned history in DB", clearTask.getException());
+                showDbErrorAlert("Clear Banned History", clearTask.getException());
+            });
             new Thread(clearTask, "db-clear-banned").start();
         }
     }
@@ -763,6 +830,23 @@ public class MainController {
     /** Returns the text currently displayed in the ban dialog. */
     public String getBanDialogMessageText() {
         return (banDialogMessage != null) ? banDialogMessage.getText() : "";
+    }
+
+    /**
+     * Shows a user-facing error alert when a database operation fails.
+     */
+    public void showDbErrorAlert(String action, Throwable ex) {
+        Platform.runLater(() -> {
+            Alert alert = new Alert(Alert.AlertType.ERROR);
+            alert.setTitle("Database Error");
+            alert.setHeaderText("Database operation failed: " + action);
+            alert.setContentText(ex != null && ex.getMessage() != null ? ex.getMessage() : "Unknown error");
+            URL cssUrl = getClass().getResource("/css/style.css");
+            if (cssUrl != null) {
+                alert.getDialogPane().getStylesheets().add(cssUrl.toExternalForm());
+            }
+            alert.show();
+        });
     }
 
     // ── Inner cell factory ─────────────────────────────────────────────────────

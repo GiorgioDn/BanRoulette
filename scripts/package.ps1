@@ -9,10 +9,18 @@ $ScriptDir   = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ProjectDir  = Join-Path $ScriptDir ".." "ban_roulette"
 $InputDir    = Join-Path $ProjectDir "target" "jpackage-input"
 $OutputDir   = Join-Path $ProjectDir "target" "installer"
-$MainJar     = "ban_roulette-1.0.0.jar"
 $MainClass   = "com.example.app.AppLauncher"
 $AppName     = "BanRoulette"
-$AppVersion  = "1.0.0"
+
+# Auto-detect built jar and version from jpackage-input
+$JarFile = Get-ChildItem -Path $InputDir -Filter "ban_roulette-*.jar" -ErrorAction SilentlyContinue | Select-Object -First 1
+if ($JarFile) {
+    $MainJar = $JarFile.Name
+    $AppVersion = $MainJar -replace '^ban_roulette-', '' -replace '\.jar$', ''
+} else {
+    $MainJar = "ban_roulette-1.0.0.jar"
+    $AppVersion = "1.0.0"
+}
 
 Write-Host "==> Packaging $AppName as .exe ..."
 New-Item -ItemType Directory -Force -Path $OutputDir | Out-Null
