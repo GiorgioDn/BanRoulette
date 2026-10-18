@@ -43,14 +43,24 @@ public class NameDao {
      */
     public long insert(String name) throws SQLException {
         final String sql = "INSERT INTO names (name) VALUES (?)";
+        long id;
         try (PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             ps.setString(1, name);
             ps.executeUpdate();
             try (ResultSet keys = ps.getGeneratedKeys()) {
-                if (keys.next()) return keys.getLong(1);
-                throw new SQLException("INSERT into names returned no generated key");
+                if (keys.next()) {
+                    id = keys.getLong(1);
+                } else {
+                    throw new SQLException("INSERT into names returned no generated key");
+                }
             }
         }
+        try {
+            new SavedNamesDao(conn).insert(name);
+        } catch (Exception ignored) {
+            // Best-effort catalog persistence
+        }
+        return id;
     }
 
     /**

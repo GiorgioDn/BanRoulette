@@ -26,12 +26,18 @@ A modern, high-polish desktop application built with **Java 21** and **JavaFX** 
   - Each time a participant is selected, their cumulative ban count increments (`ban_count`).
   - Left sidebar displays live badges (`🔨 count`) next to any participant with active bans.
   - Right sidebar provides a searchable/sortable **Banned History** view showing Name, Ban Count (`1×`, `2×`, ...), and Date/Time, with quick "Reset" and "Clear History" options.
+- **Saved Names Catalog**:
+  - Dedicated **"📁 Saved Names"** button in the bottom-right corner next to **"📜 History"**.
+  - Opens in the same sidebar panel as the Banned List (toggling smoothly between History, Saved Names, and collapsed).
+  - Displays all participant names saved in the database catalog with instant search filtering.
+  - **Click-to-Add**: clicking the **`+ Add`** button on any saved participant immediately adds them to the active roulette wheel and persists it.
+  - Convenient "+ Add All" to batch-populate the wheel from the database, and per-item deletion.
 - **Keyboard Shortcuts**:
   - <kbd>Space</kbd>: Spin the wheel (when not typing in the name input).
   - <kbd>Ctrl</kbd> + <kbd>Enter</kbd> / <kbd>⌘</kbd> + <kbd>Enter</kbd>: Instant spin accelerator from anywhere.
   - <kbd>Enter</kbd>: Add participant from the text field.
 - **Persistent Embedded Database**:
-  - Backed by an embedded H2 database with automatic schema initialization and migration.
+  - Backed by an embedded H2 database (`names`, `banned_names`, and `saved_names` tables) with automatic schema initialization and migration.
   - Graceful fallback: runs seamlessly in in-memory mode if the database file is unavailable.
 - **Native Standalone Installers**:
   - Packaged via `jpackage` with bundled Java runtime — users do not need Maven or Java pre-installed.
@@ -66,13 +72,13 @@ To compile, validate all resources, and run the test suite:
 cd BanRoulette/ban_roulette
 mvn clean verify
 ```
-This executes all 63 unit, integration, and lifecycle tests (including in-memory H2 DAO tests, wheel geometry tests, animation angle math tests, and schema-initialization idempotency tests).
+This executes all 74 unit, integration, and lifecycle tests (including in-memory H2 DAO tests, saved names catalog tests, wheel geometry tests, animation angle math tests, and schema-initialization idempotency tests).
 
 ---
 
 ## 🗄️ Database Storage
 
-Ban Roulette stores participants and ban history in a local, embedded H2 database file under the user's home directory:
+Ban Roulette stores participants, saved names, and ban history in a local, embedded H2 database file under the user's home directory:
 
 | Operating System | Database File Location |
 | :--- | :--- |
@@ -81,7 +87,7 @@ Ban Roulette stores participants and ban history in a local, embedded H2 databas
 | **Windows** | `%USERPROFILE%\.banroulette\data.mv.db` |
 
 ### Database Characteristics
-- **Idempotent Schema**: Tables `names` and `banned_names` are created automatically using `CREATE TABLE IF NOT EXISTS` and migrated on startup.
+- **Idempotent Schema**: Tables `names`, `banned_names`, and `saved_names` are created automatically using `CREATE TABLE IF NOT EXISTS` and migrated on startup.
 - **File Locking Safety**: On application exit (`Application.stop()`), the connection is cleanly closed to release H2's file lock.
 - **Resilience**: If a second instance opens or file permissions prevent database access, a user-friendly alert informs the user, and the session runs in in-memory mode without crashing.
 

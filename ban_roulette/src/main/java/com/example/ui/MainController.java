@@ -5,8 +5,10 @@ import com.example.anim.SpinAnimation;
 import com.example.db.BannedDao;
 import com.example.db.DatabaseManager;
 import com.example.db.NameDao;
+import com.example.db.SavedNamesDao;
 import com.example.model.BannedName;
 import com.example.model.Participant;
+import com.example.model.SavedName;
 import com.example.svg.HammerLoader;
 import com.example.svg.WheelGenerator;
 import javafx.animation.FadeTransition;
@@ -16,12 +18,14 @@ import javafx.application.Platform;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
+import javafx.collections.transformation.FilteredList;
 import javafx.concurrent.Task;
 import javafx.fxml.FXML;
 import javafx.geometry.Pos;
 import javafx.scene.Cursor;
 import javafx.scene.Group;
 import javafx.scene.Node;
+import javafx.scene.input.MouseButton;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
@@ -43,6 +47,7 @@ import java.security.SecureRandom;
 import java.sql.Connection;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Comparator;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -71,7 +76,6 @@ public class MainController {
     @FXML private Button     addButton;
     @FXML private Button     clearButton;
     @FXML private Button     spinButton;
-    @FXML private Button     loadSavedButton;
     @FXML private ListView<Participant> participantList;
     @FXML private StackPane  wheelContainer;
     @FXML private VBox       wheelPlaceholderBox;
@@ -84,8 +88,9 @@ public class MainController {
     @FXML private Label      banDialogMessage;
     @FXML private Button     banDialogDismissBtn;
 
-    // Right sidebar — Banned history TableView (Step 7)
+    // Right sidebar — Banned history & Saved names panels
     @FXML private VBox                         rightSidebar;
+    @FXML private VBox                         bannedBox;
     @FXML private Label                        bannedCountBadge;
     @FXML private TableView<BannedName>        bannedTable;
     @FXML private TableColumn<BannedName, String> bannedNameCol;
@@ -95,6 +100,15 @@ public class MainController {
     @FXML private Button                       clearBannedBtn;
     @FXML private Button                       toggleHistoryBtn;
 
+    // Right sidebar — Saved Names Catalog
+    @FXML private VBox                         savedNamesBox;
+    @FXML private Label                        savedCountBadge;
+    @FXML private TextField                    savedNamesFilter;
+    @FXML private ListView<SavedName>          savedNamesList;
+    @FXML private Button                       addAllSavedBtn;
+    @FXML private Button                       clearSavedBtn;
+    @FXML private Button                       toggleSavedNamesBtn;
+
     // ── State ─────────────────────────────────────────────────────────────────
 
     private final ObservableList<Participant> participants =
@@ -102,6 +116,22 @@ public class MainController {
 
     private final ObservableList<BannedName> bannedList =
             FXCollections.observableArrayList();
+
+    private final ObservableList<SavedName> savedNamesMasterList =
+            FXCollections.observableArrayList();
+
+    private FilteredList<SavedName> filteredSavedNames;
+
+    /**
+     * View mode for the right sidebar.
+     */
+    public enum RightSidebarView {
+        NONE,
+        BANNED,
+        SAVED_NAMES
+    }
+
+    private RightSidebarView currentRightView = RightSidebarView.BANNED;
 
     private final WheelGenerator wheelGenerator = new WheelGenerator();
     private final SpinAnimation  spinAnimation  = new SpinAnimation();
@@ -147,6 +177,7 @@ public class MainController {
         if (dbManager != null && dbManager.getConnection() != null) {
             loadNamesFromDb();
             loadBannedFromDb();
+            loadSavedNamesFromDb();
         }
     }
 
@@ -229,6 +260,24 @@ public class MainController {
             }
         }
 
+        // Configure Saved Names List
+        filteredSavedNames = new FilteredList<>(savedNamesMasterList, p -> true);
+        if (savedNamesFilter != null) {
+            savedNamesFilter.textProperty().addListener((obs, oldVal, newVal) -> {
+                filteredSavedNames.setPredicate(sn -> {
+                    if (newVal == null || newVal.isBlank()) return true;
+                    return sn.getName().toLowerCase().contains(newVal.trim().toLowerCase());
+                });
+            });
+        }
+        if (savedNamesList != null) {
+            savedNamesList.setItems(filteredSavedNames);
+            savedNamesList.setCellFactory(lv -> new SavedNameCell(this));
+        }
+
+        // Initialize right sidebar view (Banned List by default)
+        setRightSidebarView(RightSidebarView.BANNED);
+
         // Allow pressing Enter in the text field to add a name
         nameInput.setOnAction(e -> onAddName());
 
@@ -296,6 +345,14 @@ public class MainController {
         refreshWheel();
         updateUI();
 
+        // Also track in savedNamesMasterList if not already present
+        if (savedNamesMasterList.stream().noneMatch(sn -> sn.getName().equalsIgnoreCase(name))) {
+            savedNamesMasterList.add(new SavedName(name));
+            savedNamesMasterList.sort(Comparator.comparing(sn -> sn.getName().toLowerCase()));
+            updateSavedCountBadge();
+            if (savedNamesList != null) savedNamesList.refresh();
+        }
+
         // Persist to DB in the background, then back-fill the generated id
         if (dbManager != null) {
             Task<Long> insertTask = new Task<>() {
@@ -321,6 +378,9 @@ public class MainController {
         statusLabel.setText("");
         refreshWheel();
         updateUI();
+        if (savedNamesList != null) {
+            savedNamesList.refresh();
+        }
 
         if (dbManager != null) {
             Task<Void> clearTask = new Task<>() {
@@ -337,18 +397,6 @@ public class MainController {
         }
     }
 
-    @FXML
-    private void onLoadSavedNames() {
-        if (isSpinning) {
-            return;
-        }
-        if (dbManager != null && dbManager.getConnection() != null) {
-            flashStatus("Loading saved participants…");
-            loadNamesFromDb();
-        } else {
-            flashStatus("Database not available.");
-        }
-    }
 
     @FXML
     private void onSpin() {
@@ -569,6 +617,44 @@ public class MainController {
         new Thread(loadTask, "db-load-banned").start();
     }
 
+    /**
+     * Loads all saved participant names from the {@code saved_names} table on a
+     * background thread and updates {@link #savedNamesMasterList} on the FX thread.
+     */
+    public void loadSavedNamesFromDb() {
+        if (dbManager == null || dbManager.getConnection() == null) return;
+
+        Task<List<SavedName>> loadTask = new Task<>() {
+            @Override protected List<SavedName> call() throws Exception {
+                return new SavedNamesDao(dbManager.getConnection()).findAll();
+            }
+        };
+
+        loadTask.setOnSucceeded(e -> {
+            List<SavedName> saved = loadTask.getValue();
+            Platform.runLater(() -> {
+                savedNamesMasterList.setAll(saved);
+                updateSavedCountBadge();
+                if (savedNamesList != null) {
+                    savedNamesList.refresh();
+                }
+            });
+        });
+
+        loadTask.setOnFailed(e -> {
+            LOG.log(Level.WARNING, "Failed to load saved names from DB", loadTask.getException());
+            showDbErrorAlert("Load Saved Names", loadTask.getException());
+        });
+
+        new Thread(loadTask, "db-load-saved-names").start();
+    }
+
+    public void updateSavedCountBadge() {
+        if (savedCountBadge != null) {
+            savedCountBadge.setText(String.valueOf(savedNamesMasterList.size()));
+        }
+    }
+
     private void refreshWheel() {
         wheelContainer.getChildren().removeIf(
                 n -> n instanceof Group || "wheel-pointer".equals(n.getId()) || "wheel-scale-group".equals(n.getId()));
@@ -633,14 +719,20 @@ public class MainController {
         nameInput.setDisable(spinning);
         addButton.setDisable(spinning);
         clearButton.setDisable(spinning);
-        if (loadSavedButton != null) {
-            loadSavedButton.setDisable(spinning);
-        }
         if (clearBannedBtn != null) {
             clearBannedBtn.setDisable(spinning);
         }
         if (bannedTable != null) {
             bannedTable.setDisable(spinning);
+        }
+        if (savedNamesList != null) {
+            savedNamesList.setDisable(spinning);
+        }
+        if (addAllSavedBtn != null) {
+            addAllSavedBtn.setDisable(spinning);
+        }
+        if (clearSavedBtn != null) {
+            clearSavedBtn.setDisable(spinning);
         }
         spinButton.setDisable(spinning || participants.size() < 2);
         participantList.setDisable(spinning);
@@ -664,6 +756,9 @@ public class MainController {
         participants.remove(p);
         refreshWheel();
         updateUI();
+        if (savedNamesList != null) {
+            savedNamesList.refresh();
+        }
         flashStatus("Removed \u201c" + p.getName() + "\u201d.");
 
         if (dbManager != null && p.getId() > 0) {
@@ -696,6 +791,30 @@ public class MainController {
     /** Returns the banned names TableView. */
     public TableView<BannedName> getBannedTable() { return bannedTable; }
 
+    /** Returns the observable list of all saved names in the catalog. */
+    public ObservableList<SavedName> getSavedNamesMasterList() { return savedNamesMasterList; }
+
+    /** Returns the saved names ListView. */
+    public ListView<SavedName> getSavedNamesList() { return savedNamesList; }
+
+    /** Returns the saved names VBox container. */
+    public VBox getSavedNamesBox() { return savedNamesBox; }
+
+    /** Returns the banned history VBox container. */
+    public VBox getBannedBox() { return bannedBox; }
+
+    /** Returns the right sidebar VBox container. */
+    public VBox getRightSidebar() { return rightSidebar; }
+
+    /** Returns the toggle saved names button. */
+    public Button getToggleSavedNamesBtn() { return toggleSavedNamesBtn; }
+
+    /** Returns the toggle history button. */
+    public Button getToggleHistoryBtn() { return toggleHistoryBtn; }
+
+    /** Returns the active view mode of the right sidebar. */
+    public RightSidebarView getCurrentRightView() { return currentRightView; }
+
     // ── Restore & Banned actions ──────────────────────────────────────────────
 
     /**
@@ -710,6 +829,9 @@ public class MainController {
         bannedList.remove(item);
         updateBannedCountBadge();
         participantList.refresh();
+        if (savedNamesList != null) {
+            savedNamesList.refresh();
+        }
         flashStatus("Reset ban count for \u201c" + item.getName() + "\u201d.");
 
         if (dbManager != null && dbManager.getConnection() != null) {
@@ -737,6 +859,9 @@ public class MainController {
             bannedCountBadge.setText("0");
         }
         participantList.refresh();
+        if (savedNamesList != null) {
+            savedNamesList.refresh();
+        }
         flashStatus("Banned history cleared.");
 
         if (dbManager != null && dbManager.getConnection() != null) {
@@ -754,16 +879,236 @@ public class MainController {
         }
     }
 
+    // ── Right Sidebar Toggling (History vs. Saved Names) ─────────────────────
+
     @FXML
-    private void onToggleHistory() {
-        if (rightSidebar != null) {
-            boolean visible = !rightSidebar.isVisible();
-            rightSidebar.setVisible(visible);
-            rightSidebar.setManaged(visible);
-            if (toggleHistoryBtn != null) {
-                toggleHistoryBtn.setText(visible ? "Hide History" : "📜 History");
+    public void onToggleHistory() {
+        if (rightSidebar == null) return;
+        if (rightSidebar.isVisible() && currentRightView == RightSidebarView.BANNED) {
+            setRightSidebarView(RightSidebarView.NONE);
+        } else {
+            setRightSidebarView(RightSidebarView.BANNED);
+        }
+    }
+
+    @FXML
+    public void onToggleSavedNames() {
+        if (rightSidebar == null) return;
+        if (rightSidebar.isVisible() && currentRightView == RightSidebarView.SAVED_NAMES) {
+            setRightSidebarView(RightSidebarView.NONE);
+        } else {
+            setRightSidebarView(RightSidebarView.SAVED_NAMES);
+        }
+    }
+
+    /**
+     * Switches the right sidebar between displaying the Banned History,
+     * the Saved Names catalog, or collapsed/closed.
+     */
+    public void setRightSidebarView(RightSidebarView view) {
+        currentRightView = view;
+        switch (view) {
+            case BANNED -> {
+                if (rightSidebar != null) {
+                    rightSidebar.setVisible(true);
+                    rightSidebar.setManaged(true);
+                }
+                if (bannedBox != null) {
+                    bannedBox.setVisible(true);
+                    bannedBox.setManaged(true);
+                }
+                if (savedNamesBox != null) {
+                    savedNamesBox.setVisible(false);
+                    savedNamesBox.setManaged(false);
+                }
+                if (toggleHistoryBtn != null) toggleHistoryBtn.setText("Hide History");
+                if (toggleSavedNamesBtn != null) toggleSavedNamesBtn.setText("📁 Saved Names");
+            }
+            case SAVED_NAMES -> {
+                if (rightSidebar != null) {
+                    rightSidebar.setVisible(true);
+                    rightSidebar.setManaged(true);
+                }
+                if (bannedBox != null) {
+                    bannedBox.setVisible(false);
+                    bannedBox.setManaged(false);
+                }
+                if (savedNamesBox != null) {
+                    savedNamesBox.setVisible(true);
+                    savedNamesBox.setManaged(true);
+                }
+                if (toggleHistoryBtn != null) toggleHistoryBtn.setText("📜 History");
+                if (toggleSavedNamesBtn != null) toggleSavedNamesBtn.setText("Hide Saved");
+                loadSavedNamesFromDb();
+            }
+            case NONE -> {
+                if (rightSidebar != null) {
+                    rightSidebar.setVisible(false);
+                    rightSidebar.setManaged(false);
+                }
+                if (bannedBox != null) {
+                    bannedBox.setVisible(false);
+                    bannedBox.setManaged(false);
+                }
+                if (savedNamesBox != null) {
+                    savedNamesBox.setVisible(false);
+                    savedNamesBox.setManaged(false);
+                }
+                if (toggleHistoryBtn != null) toggleHistoryBtn.setText("📜 History");
+                if (toggleSavedNamesBtn != null) toggleSavedNamesBtn.setText("📁 Saved Names");
             }
         }
+    }
+
+    // ── Saved Names Catalog Actions ──────────────────────────────────────────
+
+    /**
+     * Adds a participant from the saved names catalog to the active roulette wheel.
+     * Persists the addition to the {@code names} table in the database.
+     *
+     * @param name the name to add
+     */
+    public void onAddParticipantFromSaved(String name) {
+        if (isSpinning) {
+            return;
+        }
+        if (name == null || name.trim().isEmpty()) {
+            return;
+        }
+        String trimmed = name.trim();
+        if (participants.size() >= WheelGenerator.MAX_PARTICIPANTS) {
+            flashStatus("Limit reached — max " + WheelGenerator.MAX_PARTICIPANTS + " participants.");
+            return;
+        }
+
+        Participant p = new Participant(trimmed);
+        participants.add(p);
+        refreshWheel();
+        updateUI();
+        flashStatus("Added \u201c" + trimmed + "\u201d to roulette.");
+        if (savedNamesList != null) {
+            savedNamesList.refresh();
+        }
+
+        if (dbManager != null && dbManager.getConnection() != null) {
+            Task<Long> insertTask = new Task<>() {
+                @Override protected Long call() throws Exception {
+                    return new NameDao(dbManager.getConnection()).insert(trimmed);
+                }
+            };
+            insertTask.setOnSucceeded(e -> p.setId(insertTask.getValue()));
+            insertTask.setOnFailed(e -> {
+                LOG.log(Level.WARNING, "Failed to persist participant from saved", insertTask.getException());
+                showDbErrorAlert("Add Participant", insertTask.getException());
+            });
+            new Thread(insertTask, "db-insert-saved-participant").start();
+        }
+    }
+
+    /**
+     * Deletes a name from the saved names catalog in-memory and in the database.
+     *
+     * @param item the saved name to remove
+     */
+    public void onDeleteSavedName(SavedName item) {
+        if (isSpinning || item == null) {
+            return;
+        }
+        savedNamesMasterList.remove(item);
+        updateSavedCountBadge();
+        flashStatus("Removed \u201c" + item.getName() + "\u201d from saved names.");
+
+        if (dbManager != null && dbManager.getConnection() != null) {
+            Task<Void> delTask = new Task<>() {
+                @Override protected Void call() throws Exception {
+                    new SavedNamesDao(dbManager.getConnection()).delete(item.getId());
+                    return null;
+                }
+            };
+            delTask.setOnFailed(e -> {
+                LOG.log(Level.WARNING, "Failed to delete saved name from DB", delTask.getException());
+                showDbErrorAlert("Delete Saved Name", delTask.getException());
+            });
+            new Thread(delTask, "db-delete-saved-name").start();
+        }
+    }
+
+    /**
+     * Adds all currently visible saved names to the active roulette wheel.
+     */
+    @FXML
+    private void onAddAllSavedToWheel() {
+        if (isSpinning) {
+            return;
+        }
+        int added = 0;
+        List<SavedName> toAdd = (filteredSavedNames != null)
+                ? List.copyOf(filteredSavedNames)
+                : List.copyOf(savedNamesMasterList);
+
+        for (SavedName sn : toAdd) {
+            if (participants.size() >= WheelGenerator.MAX_PARTICIPANTS) {
+                break;
+            }
+            String name = sn.getName();
+            Participant p = new Participant(name);
+            participants.add(p);
+            added++;
+
+            if (dbManager != null && dbManager.getConnection() != null) {
+                Task<Long> insertTask = new Task<>() {
+                    @Override protected Long call() throws Exception {
+                        return new NameDao(dbManager.getConnection()).insert(name);
+                    }
+                };
+                insertTask.setOnSucceeded(e -> p.setId(insertTask.getValue()));
+                new Thread(insertTask, "db-insert-all-saved").start();
+            }
+        }
+        refreshWheel();
+        updateUI();
+        if (savedNamesList != null) {
+            savedNamesList.refresh();
+        }
+        flashStatus("Added " + added + " saved participant(s) to roulette.");
+    }
+
+    /**
+     * Clears all saved names from the database and UI.
+     */
+    @FXML
+    private void onClearSavedNames() {
+        if (isSpinning) {
+            return;
+        }
+        savedNamesMasterList.clear();
+        updateSavedCountBadge();
+        flashStatus("Cleared all saved names from database.");
+
+        if (dbManager != null && dbManager.getConnection() != null) {
+            Task<Void> clearTask = new Task<>() {
+                @Override protected Void call() throws Exception {
+                    new SavedNamesDao(dbManager.getConnection()).deleteAll();
+                    return null;
+                }
+            };
+            clearTask.setOnFailed(e -> {
+                LOG.log(Level.WARNING, "Failed to clear saved names in DB", clearTask.getException());
+                showDbErrorAlert("Clear Saved Names", clearTask.getException());
+            });
+            new Thread(clearTask, "db-clear-saved-names").start();
+        }
+    }
+
+    /** Returns whether a participant with the given name is currently in the roulette wheel. */
+    public boolean isParticipantInWheel(String name) {
+        if (name == null) return false;
+        for (Participant p : participants) {
+            if (name.equalsIgnoreCase(p.getName())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     // ── Ban dialog display & dismiss ──────────────────────────────────────────
@@ -895,6 +1240,81 @@ public class MainController {
                 row.getStyleClass().add("cell-row");
                 HBox.setHgrow(nameLabel, Priority.ALWAYS);
                 row.setAlignment(Pos.CENTER_LEFT);
+
+                setText(null);
+                setGraphic(row);
+            }
+        }
+    }
+
+    /**
+     * Renders each saved name as a row with the name, optional ban count badge,
+     * optional in-wheel badge, an + Add button, and a × delete button.
+     * Clicking the cell or + Add adds the participant to the roulette.
+     */
+    private static class SavedNameCell extends ListCell<SavedName> {
+
+        private final MainController controller;
+
+        SavedNameCell(MainController controller) {
+            this.controller = controller;
+        }
+
+        @Override
+        protected void updateItem(SavedName item, boolean empty) {
+            super.updateItem(item, empty);
+            if (empty || item == null) {
+                setText(null);
+                setGraphic(null);
+                setOnMouseClicked(null);
+            } else {
+                Label nameLabel = new Label(item.getName());
+                nameLabel.setMaxWidth(Double.MAX_VALUE);
+                nameLabel.getStyleClass().add("cell-name-label");
+
+                int banCount = controller.getBanCountFor(item.getName());
+                Label banBadge = null;
+                if (banCount > 0) {
+                    banBadge = new Label("🔨 " + banCount);
+                    banBadge.getStyleClass().add("cell-ban-badge");
+                }
+
+                boolean inWheel = controller.isParticipantInWheel(item.getName());
+                Label inWheelBadge = null;
+                if (inWheel) {
+                    inWheelBadge = new Label("In Wheel");
+                    inWheelBadge.getStyleClass().add("cell-in-wheel-badge");
+                }
+
+                Button addBtn = new Button("+ Add");
+                addBtn.getStyleClass().add("btn-cell-add");
+                addBtn.setFocusTraversable(false);
+                addBtn.setOnAction(e -> {
+                    e.consume();
+                    controller.onAddParticipantFromSaved(item.getName());
+                });
+
+                Button deleteBtn = new Button("\u00d7");
+                deleteBtn.getStyleClass().add("btn-cell-remove");
+                deleteBtn.setTooltip(new Tooltip("Delete from database"));
+                deleteBtn.setFocusTraversable(false);
+                deleteBtn.setOnAction(e -> {
+                    e.consume();
+                    controller.onDeleteSavedName(item);
+                });
+
+                HBox row = new HBox(6);
+                row.setAlignment(Pos.CENTER_LEFT);
+                row.getChildren().add(nameLabel);
+                HBox.setHgrow(nameLabel, Priority.ALWAYS);
+
+                if (banBadge != null) {
+                    row.getChildren().add(banBadge);
+                }
+                if (inWheelBadge != null) {
+                    row.getChildren().add(inWheelBadge);
+                }
+                row.getChildren().addAll(addBtn, deleteBtn);
 
                 setText(null);
                 setGraphic(row);

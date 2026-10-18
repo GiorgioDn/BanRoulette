@@ -59,6 +59,11 @@ public class BannedDao {
                 }
             }
         }
+        try {
+            new SavedNamesDao(conn).insert(name);
+        } catch (Exception ignored) {
+            // Best-effort catalog persistence
+        }
         return findByName(name);
     }
 

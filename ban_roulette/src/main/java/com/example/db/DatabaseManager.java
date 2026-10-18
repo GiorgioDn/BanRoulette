@@ -69,6 +69,14 @@ public class DatabaseManager {
             )
             """;
 
+    private static final String DDL_SAVED_NAMES = """
+            CREATE TABLE IF NOT EXISTS saved_names (
+                id         IDENTITY PRIMARY KEY,
+                name       VARCHAR(100) NOT NULL UNIQUE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """;
+
     // ── State ──────────────────────────────────────────────────────────────────
 
     private Connection connection;
@@ -138,6 +146,10 @@ public class DatabaseManager {
             st.execute(DDL_BANNED);
             // Schema migration: ensure ban_count exists if table was created in an earlier version
             st.execute("ALTER TABLE banned_names ADD COLUMN IF NOT EXISTS ban_count INT NOT NULL DEFAULT 1");
+            st.execute(DDL_SAVED_NAMES);
+            // Seed saved_names from existing names and banned_names if any
+            st.execute("INSERT INTO saved_names (name) SELECT DISTINCT name FROM names WHERE LOWER(name) NOT IN (SELECT LOWER(name) FROM saved_names)");
+            st.execute("INSERT INTO saved_names (name) SELECT DISTINCT name FROM banned_names WHERE LOWER(name) NOT IN (SELECT LOWER(name) FROM saved_names)");
         }
     }
 }

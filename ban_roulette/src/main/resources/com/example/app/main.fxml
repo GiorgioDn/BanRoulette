@@ -35,13 +35,7 @@
             <VBox spacing="10.0" VBox.vgrow="ALWAYS">
                 <padding><Insets top="20.0" right="22.0" bottom="16.0" left="22.0"/></padding>
 
-                <HBox alignment="CENTER_LEFT" spacing="8.0">
-                    <Label text="PARTICIPANTS" styleClass="section-label" HBox.hgrow="ALWAYS" maxWidth="Infinity"/>
-                    <Button fx:id="loadSavedButton"
-                            text="↺ Load Saved"
-                            styleClass="btn-link"
-                            onAction="#onLoadSavedNames"/>
-                </HBox>
+                <Label text="PARTICIPANTS" styleClass="section-label"/>
 
                 <HBox spacing="8.0">
                     <TextField fx:id="nameInput"
@@ -134,56 +128,108 @@
         </StackPane>
     </center>
 
-    <!-- ══ RIGHT SIDEBAR — BANNED LIST (Step 7) ══════════════════════ -->
+    <!-- ══ RIGHT SIDEBAR — BANNED LIST & SAVED NAMES ═════════════════ -->
     <right>
         <VBox fx:id="rightSidebar" styleClass="sidebar-right" prefWidth="340.0">
-            <!-- Brand / Header -->
-            <VBox styleClass="sidebar-header" spacing="4.0">
-                <padding><Insets top="28.0" right="20.0" bottom="20.0" left="20.0"/></padding>
-                <HBox alignment="CENTER_LEFT" spacing="8.0">
-                    <Label text="📜  BANNED LIST" styleClass="section-label" HBox.hgrow="ALWAYS" maxWidth="Infinity"/>
-                    <Label fx:id="bannedCountBadge" text="0" styleClass="badge-count"/>
-                </HBox>
-                <Label text="Fallen participants removed by the hammer" styleClass="app-subtitle"/>
+            <!-- ── Panel 1: Banned History Box ─────────────────────── -->
+            <VBox fx:id="bannedBox" VBox.vgrow="ALWAYS">
+                <!-- Brand / Header -->
+                <VBox styleClass="sidebar-header" spacing="4.0">
+                    <padding><Insets top="28.0" right="20.0" bottom="20.0" left="20.0"/></padding>
+                    <HBox alignment="CENTER_LEFT" spacing="8.0">
+                        <Label text="📜  BANNED LIST" styleClass="section-label" HBox.hgrow="ALWAYS" maxWidth="Infinity"/>
+                        <Label fx:id="bannedCountBadge" text="0" styleClass="badge-count"/>
+                    </HBox>
+                    <Label text="Fallen participants chosen for ban" styleClass="app-subtitle"/>
+                </VBox>
+
+                <Separator styleClass="sidebar-sep"/>
+
+                <!-- Banned TableView (grows to fill height) -->
+                <VBox spacing="10.0" VBox.vgrow="ALWAYS">
+                    <padding><Insets top="16.0" right="20.0" bottom="16.0" left="20.0"/></padding>
+
+                    <TableView fx:id="bannedTable"
+                               styleClass="banned-table"
+                               VBox.vgrow="ALWAYS">
+                        <columns>
+                            <TableColumn fx:id="bannedNameCol"
+                                         text="Name"
+                                         prefWidth="105.0"/>
+                            <TableColumn fx:id="bannedCountCol"
+                                         text="Bans"
+                                         prefWidth="65.0"/>
+                            <TableColumn fx:id="bannedDateCol"
+                                         text="Last Ban"
+                                         prefWidth="85.0"/>
+                            <TableColumn fx:id="bannedActionCol"
+                                         text="Action"
+                                         prefWidth="65.0"/>
+                        </columns>
+                        <placeholder>
+                            <Label text="No banned participants yet" styleClass="table-placeholder"/>
+                        </placeholder>
+                    </TableView>
+                </VBox>
+
+                <!-- Bottom actions for banned list -->
+                <VBox styleClass="sidebar-actions" spacing="8.0">
+                    <padding><Insets top="10.0" right="20.0" bottom="20.0" left="20.0"/></padding>
+                    <Button fx:id="clearBannedBtn"
+                            text="Clear History"
+                            styleClass="btn-secondary"
+                            onAction="#onClearBannedHistory"
+                            maxWidth="Infinity"/>
+                </VBox>
             </VBox>
 
-            <Separator styleClass="sidebar-sep"/>
+            <!-- ── Panel 2: Saved Names Catalog Box ────────────────── -->
+            <VBox fx:id="savedNamesBox" VBox.vgrow="ALWAYS" visible="false" managed="false">
+                <!-- Brand / Header -->
+                <VBox styleClass="sidebar-header" spacing="4.0">
+                    <padding><Insets top="28.0" right="20.0" bottom="20.0" left="20.0"/></padding>
+                    <HBox alignment="CENTER_LEFT" spacing="8.0">
+                        <Label text="📁  SAVED NAMES" styleClass="section-label" HBox.hgrow="ALWAYS" maxWidth="Infinity"/>
+                        <Label fx:id="savedCountBadge" text="0" styleClass="badge-count-saved"/>
+                    </HBox>
+                    <Label text="Click + Add to add to the roulette" styleClass="app-subtitle"/>
+                </VBox>
 
-            <!-- Banned TableView (grows to fill height) -->
-            <VBox spacing="10.0" VBox.vgrow="ALWAYS">
-                <padding><Insets top="16.0" right="20.0" bottom="16.0" left="20.0"/></padding>
+                <Separator styleClass="sidebar-sep"/>
 
-                <TableView fx:id="bannedTable"
-                           styleClass="banned-table"
-                           VBox.vgrow="ALWAYS">
-                    <columns>
-                        <TableColumn fx:id="bannedNameCol"
-                                     text="Name"
-                                     prefWidth="105.0"/>
-                        <TableColumn fx:id="bannedCountCol"
-                                     text="Bans"
-                                     prefWidth="65.0"/>
-                        <TableColumn fx:id="bannedDateCol"
-                                     text="Last Ban"
-                                     prefWidth="85.0"/>
-                        <TableColumn fx:id="bannedActionCol"
-                                     text="Action"
-                                     prefWidth="65.0"/>
-                    </columns>
-                    <placeholder>
-                        <Label text="No banned participants yet" styleClass="table-placeholder"/>
-                    </placeholder>
-                </TableView>
-            </VBox>
+                <!-- Saved Names content (Filter + ListView) -->
+                <VBox spacing="10.0" VBox.vgrow="ALWAYS">
+                    <padding><Insets top="16.0" right="20.0" bottom="16.0" left="20.0"/></padding>
 
-            <!-- Bottom actions for right sidebar -->
-            <VBox styleClass="sidebar-actions" spacing="8.0">
-                <padding><Insets top="10.0" right="20.0" bottom="20.0" left="20.0"/></padding>
-                <Button fx:id="clearBannedBtn"
-                        text="Clear History"
-                        styleClass="btn-secondary"
-                        onAction="#onClearBannedHistory"
-                        maxWidth="Infinity"/>
+                    <TextField fx:id="savedNamesFilter"
+                               promptText="🔍 Filter saved names…"
+                               styleClass="text-input-field"/>
+
+                    <ListView fx:id="savedNamesList"
+                              styleClass="saved-names-list"
+                              VBox.vgrow="ALWAYS">
+                        <placeholder>
+                            <Label text="No saved names in database yet" styleClass="table-placeholder"/>
+                        </placeholder>
+                    </ListView>
+                </VBox>
+
+                <!-- Bottom actions for saved names -->
+                <VBox styleClass="sidebar-actions" spacing="8.0">
+                    <padding><Insets top="10.0" right="20.0" bottom="20.0" left="20.0"/></padding>
+                    <HBox spacing="8.0">
+                        <Button fx:id="addAllSavedBtn"
+                                text="+ Add All"
+                                styleClass="btn-secondary"
+                                onAction="#onAddAllSavedToWheel"
+                                HBox.hgrow="ALWAYS"
+                                maxWidth="Infinity"/>
+                        <Button fx:id="clearSavedBtn"
+                                text="Clear All"
+                                styleClass="btn-danger-outline"
+                                onAction="#onClearSavedNames"/>
+                    </HBox>
+                </VBox>
             </VBox>
         </VBox>
     </right>
@@ -198,11 +244,14 @@
                    styleClass="status-bar-text"
                    HBox.hgrow="ALWAYS"
                    maxWidth="Infinity"/>
+            <Button fx:id="toggleSavedNamesBtn"
+                    text="📁 Saved Names"
+                    styleClass="btn-link"
+                    onAction="#onToggleSavedNames"/>
             <Button fx:id="toggleHistoryBtn"
                     text="📜 History"
                     styleClass="btn-link"
                     onAction="#onToggleHistory"/>
         </HBox>
     </bottom>
-
 </BorderPane>
