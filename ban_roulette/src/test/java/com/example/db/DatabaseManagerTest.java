@@ -67,10 +67,10 @@ class DatabaseManagerTest {
         // Run 1: Create DB and insert rows
         DatabaseManager db1 = new DatabaseManager();
         db1.connect(url);
-        NameDao nameDao1 = new NameDao(db1.getConnection());
+        SavedNamesDao savedNamesDao1 = new SavedNamesDao(db1.getConnection());
         BannedDao bannedDao1 = new BannedDao(db1.getConnection());
 
-        nameDao1.insert("PersistentParticipant");
+        savedNamesDao1.insert("PersistentParticipant");
         bannedDao1.recordBan("PersistentBanned");
         db1.disconnect();
 
@@ -78,12 +78,12 @@ class DatabaseManagerTest {
         DatabaseManager db2 = new DatabaseManager();
         assertDoesNotThrow(() -> db2.connect(url), "Second connect/initSchema should succeed without throwing");
 
-        NameDao nameDao2 = new NameDao(db2.getConnection());
+        SavedNamesDao savedNamesDao2 = new SavedNamesDao(db2.getConnection());
         BannedDao bannedDao2 = new BannedDao(db2.getConnection());
 
         // Verify data was NOT wiped or lost
-        assertEquals(1, nameDao2.findAll().size(), "Participant in names should still exist");
-        assertEquals("PersistentParticipant", nameDao2.findAll().get(0).getName());
+        assertEquals(2, savedNamesDao2.findAll().size(), "PersistentParticipant and PersistentBanned should both be in saved_names");
+        assertNotNull(savedNamesDao2.findByName("PersistentParticipant"));
 
         assertEquals(1, bannedDao2.count(), "Banned name in banned_names should still exist");
         assertEquals(1, bannedDao2.getBanCount("PersistentBanned"));

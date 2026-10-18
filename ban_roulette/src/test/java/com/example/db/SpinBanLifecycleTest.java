@@ -42,49 +42,48 @@ class SpinBanLifecycleTest {
             DatabaseManager dbSession1 = new DatabaseManager();
             dbSession1.connect(dbUrl);
 
-            NameDao nameDao1 = new NameDao(dbSession1.getConnection());
+            SavedNamesDao savedNamesDao1 = new SavedNamesDao(dbSession1.getConnection());
             BannedDao bannedDao1 = new BannedDao(dbSession1.getConnection());
 
-            // 1. Initialise participants
-            long idAlice = nameDao1.insert("Alice");
-            long idBob = nameDao1.insert("Bob");
-            long idCharlie = nameDao1.insert("Charlie");
+            // 1. Initialise participants in memory (including duplicate Bob)
+            List<Participant> activeParticipants = List.of(
+                    new Participant("Alice"),
+                    new Participant("Bob"),
+                    new Participant("Charlie"),
+                    new Participant("Bob") // Can be inserted multiple times in participants
+            );
 
-            List<Participant> active1 = nameDao1.findAll();
-            assertEquals(3, active1.size());
+            // Database should be empty before spinning
+            assertEquals(0, savedNamesDao1.count(), "saved_names must be empty before spin");
+            assertEquals(0, bannedDao1.count(), "banned_names must be empty before any bans");
 
-            // Requirement: "insert the name in the ban table only with atleast one ban"
-            assertEquals(0, bannedDao1.count(), "Ban table must be empty before any bans");
-            assertEquals(0, bannedDao1.getBanCount("Bob"));
-
-            // 2. Wheel generated with all 3 names
-            Group wheel1 = wheelGenerator.generateWheel(active1, 200.0);
+            // 2. Wheel generated with all names
+            Group wheel1 = wheelGenerator.generateWheel(activeParticipants, 200.0);
             assertNotNull(wheel1);
 
-            // 3. Pre-select Bob for a ban
-            nameDao1.ban(idBob, bannedDao1);
+            // 3. User clicks Spin -> records usage of all names in the wheel to saved_names
+            List<String> namesToSave = activeParticipants.stream()
+                    .map(Participant::getName)
+                    .distinct()
+                    .toList();
+            savedNamesDao1.recordUsage(namesToSave);
 
-            // Requirement: "doesn't block the name to being reinserted or delete it from the list of name used"
-            List<Participant> afterBan1 = nameDao1.findAll();
-            assertEquals(3, afterBan1.size(), "Banned name must NOT be deleted from names table");
-            assertTrue(afterBan1.stream().anyMatch(p -> p.getName().equals("Bob")));
+            assertEquals(3, savedNamesDao1.count(), "saved_names should have exactly 3 distinct names");
+            assertNotNull(savedNamesDao1.findByName("Alice").getLastUsedAt());
+            assertNotNull(savedNamesDao1.findByName("Bob").getLastUsedAt());
+            assertNotNull(savedNamesDao1.findByName("Charlie").getLastUsedAt());
 
-            // Requirement: "stored how many times the name was choosen by the roulet for the ban"
+            // 4. Bob is selected for a ban (first ban)
+            bannedDao1.recordBan("Bob");
             assertEquals(1, bannedDao1.count());
             assertEquals(1, bannedDao1.getBanCount("Bob"));
 
-            // 4. Second ban for Bob
-            nameDao1.ban(idBob, bannedDao1);
-            assertEquals(3, nameDao1.findAll().size(), "Name still present after second ban");
+            // 5. Second ban for Bob
+            bannedDao1.recordBan("Bob");
             assertEquals(1, bannedDao1.count(), "Still 1 distinct banned name");
             assertEquals(2, bannedDao1.getBanCount("Bob"), "Ban count should increment to 2");
 
-            // Requirement: "doesn't block the name to being reinserted"
-            assertDoesNotThrow(() -> nameDao1.insert("Bob"),
-                    "Reinserting a banned name must not be blocked");
-            assertEquals(4, nameDao1.findAll().size());
-
-            // 5. App closes cleanly
+            // 6. App closes cleanly
             dbSession1.disconnect();
 
             // ==========================================
@@ -93,28 +92,16 @@ class SpinBanLifecycleTest {
             DatabaseManager dbSession2 = new DatabaseManager();
             dbSession2.connect(dbUrl);
 
-            NameDao nameDao2 = new NameDao(dbSession2.getConnection());
+            SavedNamesDao savedNamesDao2 = new SavedNamesDao(dbSession2.getConnection());
             BannedDao bannedDao2 = new BannedDao(dbSession2.getConnection());
 
-            // Load saved names and banned history
-            List<Participant> loadedParticipants = nameDao2.findAll();
-            List<BannedName> loadedBanned = bannedDao2.findAll();
-
-            assertEquals(4, loadedParticipants.size());
-            assertEquals(1, loadedBanned.size());
-            assertEquals("Bob", loadedBanned.get(0).getName());
-            assertEquals(2, loadedBanned.get(0).getBanCount(), "Ban count must persist as 2 across reopen");
-
-            // Wheel generates with loaded participants
-            Group wheel2 = wheelGenerator.generateWheel(loadedParticipants, 200.0);
-            assertNotNull(wheel2);
+            assertEquals(3, savedNamesDao2.count());
+            assertEquals(1, bannedDao2.count());
+            assertEquals("Bob", bannedDao2.findAll().get(0).getName());
+            assertEquals(2, bannedDao2.findAll().get(0).getBanCount(), "Ban count must persist as 2 across reopen");
 
             // Ban Alice
-            long idAlice2 = loadedParticipants.stream()
-                    .filter(p -> p.getName().equals("Alice"))
-                    .findFirst().orElseThrow().getId();
-            nameDao2.ban(idAlice2, bannedDao2);
-
+            bannedDao2.recordBan("Alice");
             assertEquals(2, bannedDao2.count());
             assertEquals(1, bannedDao2.getBanCount("Alice"));
             assertEquals(3, bannedDao2.totalBans(), "Total bans should be Bob(2) + Alice(1) = 3");
@@ -127,15 +114,15 @@ class SpinBanLifecycleTest {
             assertEquals(1, ordered.get(1).getBanCount());
 
             // ==========================================
-            // SESSION 3: Reset ban for Bob
+            // SESSION 3: Remove ban for Bob (Action button)
             // ==========================================
             dbSession2.disconnect();
 
             DatabaseManager dbSession3 = new DatabaseManager();
             dbSession3.connect(dbUrl);
 
-            NameDao nameDao3 = new NameDao(dbSession3.getConnection());
             BannedDao bannedDao3 = new BannedDao(dbSession3.getConnection());
+            SavedNamesDao savedNamesDao3 = new SavedNamesDao(dbSession3.getConnection());
 
             BannedName bobBan = bannedDao3.findByName("Bob");
             assertNotNull(bobBan);
@@ -144,8 +131,8 @@ class SpinBanLifecycleTest {
             assertEquals(0, bannedDao3.getBanCount("Bob"), "Bob ban count reset to 0");
             assertEquals(1, bannedDao3.count(), "Only Alice remains in ban table");
 
-            // Active names table is untouched
-            assertEquals(4, nameDao3.findAll().size());
+            // Saved names catalog is untouched
+            assertEquals(3, savedNamesDao3.count());
 
             dbSession3.disconnect();
 

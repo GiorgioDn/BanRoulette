@@ -4,7 +4,6 @@ import com.example.anim.HitAnimation;
 import com.example.anim.SpinAnimation;
 import com.example.db.BannedDao;
 import com.example.db.DatabaseManager;
-import com.example.db.NameDao;
 import com.example.db.SavedNamesDao;
 import com.example.model.BannedName;
 import com.example.model.Participant;
@@ -175,9 +174,9 @@ public class MainController {
     public void setDatabaseManager(DatabaseManager dbManager) {
         this.dbManager = dbManager;
         if (dbManager != null && dbManager.getConnection() != null) {
-            loadNamesFromDb();
             loadBannedFromDb();
             loadSavedNamesFromDb();
+            loadLastUsedParticipantsFromDb();
         }
     }
 
@@ -239,21 +238,21 @@ public class MainController {
 
             if (bannedActionCol != null) {
                 bannedActionCol.setCellFactory(col -> new TableCell<>() {
-                    private final Button resetBtn = new Button("Reset");
+                    private final Button removeBtn = new Button("Remove");
                     {
-                        resetBtn.getStyleClass().add("btn-restore");
-                        resetBtn.setFocusTraversable(false);
-                        resetBtn.setOnAction(e -> {
+                        removeBtn.getStyleClass().add("btn-restore");
+                        removeBtn.setFocusTraversable(false);
+                        removeBtn.setOnAction(e -> {
                             BannedName item = getTableView().getItems().get(getIndex());
                             if (item != null) {
-                                onRestoreParticipant(item);
+                                onRemoveBannedName(item);
                             }
                         });
                     }
                     @Override
                     protected void updateItem(Void item, boolean empty) {
                         super.updateItem(item, empty);
-                        setGraphic(empty ? null : resetBtn);
+                        setGraphic(empty ? null : removeBtn);
                         setAlignment(Pos.CENTER);
                     }
                 });
@@ -314,10 +313,19 @@ public class MainController {
         }
     }
 
+    /** Returns the active participants observable list. */
+    public ObservableList<Participant> getParticipants() { return participants; }
+
+    /** Returns the name input text field. */
+    public TextField getNameInput() { return nameInput; }
+
+    /** Returns the participant ListView. */
+    public ListView<Participant> getParticipantList() { return participantList; }
+
     // ── Event handlers ─────────────────────────────────────────────────────────
 
     @FXML
-    private void onAddName() {
+    void onAddName() {
         if (isSpinning) {
             return;
         }
@@ -337,40 +345,17 @@ public class MainController {
             return;
         }
 
-        // Optimistic UI update: add in-memory immediately so the user sees instant feedback
+        // Add to participants purely in-memory (no DB call)
         Participant p = new Participant(name);
         participants.add(p);
         nameInput.clear();
         nameInput.requestFocus();
         refreshWheel();
         updateUI();
-
-        // Also track in savedNamesMasterList if not already present
-        if (savedNamesMasterList.stream().noneMatch(sn -> sn.getName().equalsIgnoreCase(name))) {
-            savedNamesMasterList.add(new SavedName(name));
-            savedNamesMasterList.sort(Comparator.comparing(sn -> sn.getName().toLowerCase()));
-            updateSavedCountBadge();
-            if (savedNamesList != null) savedNamesList.refresh();
-        }
-
-        // Persist to DB in the background, then back-fill the generated id
-        if (dbManager != null) {
-            Task<Long> insertTask = new Task<>() {
-                @Override protected Long call() throws Exception {
-                    return new NameDao(dbManager.getConnection()).insert(name);
-                }
-            };
-            insertTask.setOnSucceeded(e -> p.setId(insertTask.getValue()));
-            insertTask.setOnFailed(e -> {
-                LOG.log(Level.WARNING, "Failed to persist participant", insertTask.getException());
-                showDbErrorAlert("Add Participant", insertTask.getException());
-            });
-            new Thread(insertTask, "db-insert").start();
-        }
     }
 
     @FXML
-    private void onClearAll() {
+    void onClearAll() {
         if (isSpinning) {
             return;
         }
@@ -378,28 +363,11 @@ public class MainController {
         statusLabel.setText("");
         refreshWheel();
         updateUI();
-        if (savedNamesList != null) {
-            savedNamesList.refresh();
-        }
-
-        if (dbManager != null) {
-            Task<Void> clearTask = new Task<>() {
-                @Override protected Void call() throws Exception {
-                    new NameDao(dbManager.getConnection()).deleteAll();
-                    return null;
-                }
-            };
-            clearTask.setOnFailed(e -> {
-                LOG.log(Level.WARNING, "Failed to clear participants in DB", clearTask.getException());
-                showDbErrorAlert("Clear All Participants", clearTask.getException());
-            });
-            new Thread(clearTask, "db-clear").start();
-        }
     }
 
 
     @FXML
-    private void onSpin() {
+    void onSpin() {
         if (isSpinning) {
             return;
         }
@@ -413,6 +381,45 @@ public class MainController {
 
         isSpinning = true;
         setUiSpinningState(true);
+
+        // Save all names currently on the wheel to the database (saved_names)
+        List<String> participantNames = participants.stream()
+                .map(Participant::getName)
+                .filter(n -> n != null && !n.isBlank())
+                .distinct()
+                .toList();
+
+        if (dbManager != null && dbManager.getConnection() != null) {
+            Task<Void> saveTask = new Task<>() {
+                @Override protected Void call() throws Exception {
+                    new SavedNamesDao(dbManager.getConnection()).recordUsage(participantNames);
+                    return null;
+                }
+            };
+            saveTask.setOnSucceeded(e -> loadSavedNamesFromDb());
+            saveTask.setOnFailed(e -> {
+                LOG.log(Level.WARNING, "Failed to persist participant names on spin", saveTask.getException());
+                showDbErrorAlert("Save Participants on Spin", saveTask.getException());
+            });
+            new Thread(saveTask, "db-save-on-spin").start();
+        } else {
+            for (String pName : participantNames) {
+                boolean found = false;
+                for (SavedName sn : savedNamesMasterList) {
+                    if (sn.getName().equalsIgnoreCase(pName)) {
+                        sn.setLastUsedAt(LocalDateTime.now());
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) {
+                    savedNamesMasterList.add(new SavedName(pName, LocalDateTime.now()));
+                }
+            }
+            savedNamesMasterList.sort(Comparator.comparing(sn -> sn.getName().toLowerCase()));
+            updateSavedCountBadge();
+            if (savedNamesList != null) savedNamesList.refresh();
+        }
 
         // 1. Fair pre-selection of winner (testable, independent of animation physics)
         SecureRandom random = new SecureRandom();
@@ -555,39 +562,6 @@ public class MainController {
     // ── Private helpers ────────────────────────────────────────────────────────
 
     /**
-     * Loads all saved participants from the {@code names} table on a background
-     * thread, then populates the UI list with {@code Platform.runLater}.
-     */
-    private void loadNamesFromDb() {
-        Task<List<Participant>> loadTask = new Task<>() {
-            @Override protected List<Participant> call() throws Exception {
-                return new NameDao(dbManager.getConnection()).findAll();
-            }
-        };
-
-        loadTask.setOnSucceeded(e -> {
-            List<Participant> saved = loadTask.getValue();
-            Platform.runLater(() -> {
-                participants.setAll(saved);
-                refreshWheel();
-                updateUI();
-                if (!saved.isEmpty()) {
-                    flashStatus(saved.size() + " participant(s) loaded from database.");
-                } else {
-                    flashStatus("No saved participants found in database.");
-                }
-            });
-        });
-
-        loadTask.setOnFailed(e -> {
-            LOG.log(Level.WARNING, "Failed to load participants from DB", loadTask.getException());
-            showDbErrorAlert("Load Participants", loadTask.getException());
-        });
-
-        new Thread(loadTask, "db-load").start();
-    }
-
-    /**
      * Loads all banned participants from the {@code banned_names} table on a
      * background thread and updates {@link #bannedList} on the FX thread.
      */
@@ -647,6 +621,43 @@ public class MainController {
         });
 
         new Thread(loadTask, "db-load-saved-names").start();
+    }
+
+    /**
+     * Loads the last used participants from the database on startup
+     * and populates the roulette wheel participants list.
+     */
+    void loadLastUsedParticipantsFromDb() {
+        if (dbManager == null || dbManager.getConnection() == null) return;
+
+        Task<List<String>> loadTask = new Task<>() {
+            @Override protected List<String> call() throws Exception {
+                return new SavedNamesDao(dbManager.getConnection()).findLastUsedNames();
+            }
+        };
+
+        loadTask.setOnSucceeded(e -> {
+            List<String> lastUsed = loadTask.getValue();
+            if (lastUsed != null && !lastUsed.isEmpty()) {
+                Platform.runLater(() -> {
+                    // Fill participants list with the last used names if currently empty
+                    if (participants.isEmpty()) {
+                        for (String name : lastUsed) {
+                            participants.add(new Participant(name));
+                        }
+                        refreshWheel();
+                        updateUI();
+                        flashStatus(lastUsed.size() + " last used participant(s) loaded.");
+                    }
+                });
+            }
+        });
+
+        loadTask.setOnFailed(e -> {
+            LOG.log(Level.WARNING, "Failed to load last used names from DB", loadTask.getException());
+        });
+
+        new Thread(loadTask, "db-load-last-used").start();
     }
 
     public void updateSavedCountBadge() {
@@ -760,20 +771,6 @@ public class MainController {
             savedNamesList.refresh();
         }
         flashStatus("Removed \u201c" + p.getName() + "\u201d.");
-
-        if (dbManager != null && p.getId() > 0) {
-            Task<Void> deleteTask = new Task<>() {
-                @Override protected Void call() throws Exception {
-                    new NameDao(dbManager.getConnection()).delete(p.getId());
-                    return null;
-                }
-            };
-            deleteTask.setOnFailed(e -> {
-                LOG.log(Level.WARNING, "Failed to delete participant from DB", deleteTask.getException());
-                showDbErrorAlert("Remove Participant", deleteTask.getException());
-            });
-            new Thread(deleteTask, "db-delete").start();
-        }
     }
 
     /** Returns the currently displayed wheel Group. */
@@ -818,10 +815,10 @@ public class MainController {
     // ── Restore & Banned actions ──────────────────────────────────────────────
 
     /**
-     * Resets a banned participant's count: removes them from the banned list
+     * Removes a banned participant: removes them from the banned list
      * and clears the ban record in the database.
      */
-    void onRestoreParticipant(BannedName item) {
+    void onRemoveBannedName(BannedName item) {
         if (isSpinning || item == null) {
             return;
         }
@@ -832,7 +829,7 @@ public class MainController {
         if (savedNamesList != null) {
             savedNamesList.refresh();
         }
-        flashStatus("Reset ban count for \u201c" + item.getName() + "\u201d.");
+        flashStatus("Removed \u201c" + item.getName() + "\u201d from banned list.");
 
         if (dbManager != null && dbManager.getConnection() != null) {
             Task<Void> deleteTask = new Task<>() {
@@ -842,11 +839,16 @@ public class MainController {
                 }
             };
             deleteTask.setOnFailed(e -> {
-                LOG.log(Level.WARNING, "Failed to reset ban in DB", deleteTask.getException());
-                showDbErrorAlert("Reset Ban Count", deleteTask.getException());
+                LOG.log(Level.WARNING, "Failed to remove ban in DB", deleteTask.getException());
+                showDbErrorAlert("Remove Banned Name", deleteTask.getException());
             });
             new Thread(deleteTask, "db-delete-banned").start();
         }
+    }
+
+    /** Alias for backward compatibility. */
+    void onRestoreParticipant(BannedName item) {
+        onRemoveBannedName(item);
     }
 
     @FXML
@@ -964,7 +966,7 @@ public class MainController {
 
     /**
      * Adds a participant from the saved names catalog to the active roulette wheel.
-     * Persists the addition to the {@code names} table in the database.
+     * Purely in-memory: does not call the database.
      *
      * @param name the name to add
      */
@@ -988,20 +990,6 @@ public class MainController {
         flashStatus("Added \u201c" + trimmed + "\u201d to roulette.");
         if (savedNamesList != null) {
             savedNamesList.refresh();
-        }
-
-        if (dbManager != null && dbManager.getConnection() != null) {
-            Task<Long> insertTask = new Task<>() {
-                @Override protected Long call() throws Exception {
-                    return new NameDao(dbManager.getConnection()).insert(trimmed);
-                }
-            };
-            insertTask.setOnSucceeded(e -> p.setId(insertTask.getValue()));
-            insertTask.setOnFailed(e -> {
-                LOG.log(Level.WARNING, "Failed to persist participant from saved", insertTask.getException());
-                showDbErrorAlert("Add Participant", insertTask.getException());
-            });
-            new Thread(insertTask, "db-insert-saved-participant").start();
         }
     }
 
@@ -1035,6 +1023,7 @@ public class MainController {
 
     /**
      * Adds all currently visible saved names to the active roulette wheel.
+     * Purely in-memory: does not call the database.
      */
     @FXML
     private void onAddAllSavedToWheel() {
@@ -1054,16 +1043,6 @@ public class MainController {
             Participant p = new Participant(name);
             participants.add(p);
             added++;
-
-            if (dbManager != null && dbManager.getConnection() != null) {
-                Task<Long> insertTask = new Task<>() {
-                    @Override protected Long call() throws Exception {
-                        return new NameDao(dbManager.getConnection()).insert(name);
-                    }
-                };
-                insertTask.setOnSucceeded(e -> p.setId(insertTask.getValue()));
-                new Thread(insertTask, "db-insert-all-saved").start();
-            }
         }
         refreshWheel();
         updateUI();
@@ -1248,9 +1227,8 @@ public class MainController {
     }
 
     /**
-     * Renders each saved name as a row with the name, optional ban count badge,
-     * optional in-wheel badge, an + Add button, and a × delete button.
-     * Clicking the cell or + Add adds the participant to the roulette.
+     * Renders each saved name as a row with ONLY the name, an + Add button,
+     * and a × delete button.
      */
     private static class SavedNameCell extends ListCell<SavedName> {
 
@@ -1272,20 +1250,6 @@ public class MainController {
                 nameLabel.setMaxWidth(Double.MAX_VALUE);
                 nameLabel.getStyleClass().add("cell-name-label");
 
-                int banCount = controller.getBanCountFor(item.getName());
-                Label banBadge = null;
-                if (banCount > 0) {
-                    banBadge = new Label("🔨 " + banCount);
-                    banBadge.getStyleClass().add("cell-ban-badge");
-                }
-
-                boolean inWheel = controller.isParticipantInWheel(item.getName());
-                Label inWheelBadge = null;
-                if (inWheel) {
-                    inWheelBadge = new Label("In Wheel");
-                    inWheelBadge.getStyleClass().add("cell-in-wheel-badge");
-                }
-
                 Button addBtn = new Button("+ Add");
                 addBtn.getStyleClass().add("btn-cell-add");
                 addBtn.setFocusTraversable(false);
@@ -1303,19 +1267,12 @@ public class MainController {
                     controller.onDeleteSavedName(item);
                 });
 
-                HBox row = new HBox(6);
+                HBox row = new HBox(8, nameLabel, addBtn, deleteBtn);
                 row.setAlignment(Pos.CENTER_LEFT);
-                row.getChildren().add(nameLabel);
+                row.getStyleClass().add("cell-row");
                 HBox.setHgrow(nameLabel, Priority.ALWAYS);
 
-                if (banBadge != null) {
-                    row.getChildren().add(banBadge);
-                }
-                if (inWheelBadge != null) {
-                    row.getChildren().add(inWheelBadge);
-                }
-                row.getChildren().addAll(addBtn, deleteBtn);
-
+                setOnMouseClicked(null);
                 setText(null);
                 setGraphic(row);
             }

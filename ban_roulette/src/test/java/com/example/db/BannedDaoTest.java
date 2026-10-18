@@ -137,29 +137,21 @@ class BannedDaoTest {
                 "Deleting a non-existent id should be a silent no-op");
     }
 
-    // ── restore (reset ban and ensure presence in names) ───────────────────────
+    // ── restore (remove ban record) ───────────────────────────────────────────
 
     @Test
     @Order(10)
     void restoreResetsBanRecord() throws SQLException {
-        NameDao nameDao = new NameDao(db.getConnection());
-        nameDao.deleteAll();
-
         long id = bannedDao.insert("Judy");
         assertEquals(1, bannedDao.count());
 
-        com.example.model.Participant restored = bannedDao.restore(id, nameDao);
-        assertNotNull(restored);
-        assertEquals("Judy", restored.getName());
+        String restored = bannedDao.restore(id);
+        assertEquals("Judy", restored);
 
         // Should be removed from banned_names (count reset to 0)
         assertEquals(0, bannedDao.count());
         assertTrue(bannedDao.findAll().isEmpty());
-
-        // Should be present in names
-        List<com.example.model.Participant> participants = nameDao.findAll();
-        assertEquals(1, participants.size());
-        assertEquals("Judy", participants.get(0).getName());
+        assertEquals(0, bannedDao.getBanCount("Judy"));
     }
 
     // ── deleteAll ──────────────────────────────────────────────────────────────

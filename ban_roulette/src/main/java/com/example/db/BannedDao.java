@@ -1,7 +1,6 @@
 package com.example.db;
 
 import com.example.model.BannedName;
-import com.example.model.Participant;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -174,26 +173,16 @@ public class BannedDao {
     }
 
     /**
-     * Restores a banned name: clears its ban record from {@code banned_names}
-     * and ensures it is present in {@code names}.
+     * Clears a banned name record from {@code banned_names}.
      *
-     * @param id the {@code banned_names.id} to restore
-     * @param nameDao the DAO used to verify or re-insert into {@code names}
-     * @return the {@link Participant} record
+     * @param id the {@code banned_names.id} to remove
+     * @return the name of the removed participant
      * @throws SQLException on any JDBC error
      */
-    public Participant restore(long id, NameDao nameDao) throws SQLException {
+    public String restore(long id) throws SQLException {
         String name = findNameById(id);
         delete(id);
-        // If not already in names table, insert it
-        List<Participant> active = nameDao.findAll();
-        for (Participant p : active) {
-            if (p.getName().equalsIgnoreCase(name)) {
-                return p;
-            }
-        }
-        long newId = nameDao.insert(name);
-        return new Participant(newId, name);
+        return name;
     }
 
     /**

@@ -103,6 +103,7 @@ public class App extends Application {
         stage.setMinWidth(960);
         stage.setMinHeight(600);
         stage.setScene(scene);
+        stage.setOnCloseRequest(event -> stop());
         stage.show();
 
         // Error dialog for DB initialization failure (Step 8 polish)

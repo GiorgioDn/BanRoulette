@@ -14,11 +14,16 @@ public class SavedName {
 
     private long id;
     private String name;
-    private LocalDateTime createdAt;
+    private LocalDateTime lastUsedAt;
 
     /** In-memory constructor. */
     public SavedName(String name) {
         this(0, name, LocalDateTime.now());
+    }
+
+    /** In-memory constructor with lastUsedAt. */
+    public SavedName(String name, LocalDateTime lastUsedAt) {
+        this(0, name, lastUsedAt);
     }
 
     /** Constructor with id and name. */
@@ -27,20 +32,23 @@ public class SavedName {
     }
 
     /** Full constructor for DB-backed rows. */
-    public SavedName(long id, String name, LocalDateTime createdAt) {
+    public SavedName(long id, String name, LocalDateTime lastUsedAt) {
         this.id = id;
         this.name = name;
-        this.createdAt = (createdAt != null) ? createdAt : LocalDateTime.now();
+        this.lastUsedAt = (lastUsedAt != null) ? lastUsedAt : LocalDateTime.now();
     }
 
-    public long getId()                             { return id; }
-    public void setId(long id)                      { this.id = id; }
+    public long getId()                               { return id; }
+    public void setId(long id)                        { this.id = id; }
 
-    public String getName()                         { return name; }
-    public void setName(String name)                { this.name = name; }
+    public String getName()                           { return name; }
+    public void setName(String name)                  { this.name = name; }
 
-    public LocalDateTime getCreatedAt()             { return createdAt; }
-    public void setCreatedAt(LocalDateTime createdAt){ this.createdAt = createdAt; }
+    public LocalDateTime getLastUsedAt()              { return lastUsedAt; }
+    public void setLastUsedAt(LocalDateTime lastUsedAt){ this.lastUsedAt = lastUsedAt; }
+
+    public LocalDateTime getCreatedAt()               { return lastUsedAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.lastUsedAt = createdAt; }
 
     @Override
     public boolean equals(Object o) {

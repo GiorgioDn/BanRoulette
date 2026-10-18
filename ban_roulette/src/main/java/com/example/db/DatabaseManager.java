@@ -26,15 +26,13 @@ import java.util.logging.Logger;
  * <p>On shutdown, call {@link #disconnect()} from
  * {@link javafx.application.Application#stop()} to release H2's file lock.
  *
- * <h2>Design decisions</h2>
+ * <h2>Database Schema</h2>
  * <ul>
- *   <li><b>Duplicates allowed</b> — no {@code UNIQUE} constraint on {@code name}.
- *       Real-world groups often have two people with the same first name and
- *       a {@code UNIQUE} constraint would be more annoying than helpful.</li>
- *   <li><b>Ban = move</b> — when a participant is banned, their row is deleted
- *       from {@code names} and inserted into {@code banned_names} in a single
- *       transaction ({@link com.example.db.NameDao#ban}). A crash cannot
- *       leave the two tables inconsistent.</li>
+ *   <li><b>saved_names</b> — Persistent catalog of distinct names saved in the database
+ *       along with their {@code last_used_at} timestamp. When the wheel is spun, all
+ *       participant names in the wheel are added or updated in this table.</li>
+ *   <li><b>banned_names</b> — Stores distinct participants who have received at least one ban,
+ *       along with their cumulative {@code ban_count} and {@code banned_at} timestamp.</li>
  * </ul>
  */
 public class DatabaseManager {
@@ -52,11 +50,11 @@ public class DatabaseManager {
 
     // ── DDL ────────────────────────────────────────────────────────────────────
 
-    private static final String DDL_NAMES = """
-            CREATE TABLE IF NOT EXISTS names (
-                id         IDENTITY PRIMARY KEY,
-                name       VARCHAR(100) NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    private static final String DDL_SAVED_NAMES = """
+            CREATE TABLE IF NOT EXISTS saved_names (
+                id           IDENTITY PRIMARY KEY,
+                name         VARCHAR(100) NOT NULL UNIQUE,
+                last_used_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
             """;
 
@@ -69,19 +67,11 @@ public class DatabaseManager {
             )
             """;
 
-    private static final String DDL_SAVED_NAMES = """
-            CREATE TABLE IF NOT EXISTS saved_names (
-                id         IDENTITY PRIMARY KEY,
-                name       VARCHAR(100) NOT NULL UNIQUE,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-            """;
-
     // ── State ──────────────────────────────────────────────────────────────────
 
     private Connection connection;
 
-    // ── Public API ─────────────────────────────────────────────────────────────
+    private Thread shutdownHook;
 
     /**
      * Opens (or creates) the H2 database and runs the schema initialiser.
@@ -112,6 +102,15 @@ public class DatabaseManager {
         connection = DriverManager.getConnection(jdbcUrl, "sa", "");
         initSchema();
         LOG.info("Database connected: " + jdbcUrl);
+
+        if (shutdownHook == null && !jdbcUrl.contains(":mem:")) {
+            shutdownHook = new Thread(this::disconnect, "db-shutdown-hook");
+            try {
+                Runtime.getRuntime().addShutdownHook(shutdownHook);
+            } catch (IllegalStateException ignored) {
+                // JVM already shutting down
+            }
+        }
     }
 
     /** @return the active JDBC {@link Connection} */
@@ -119,13 +118,24 @@ public class DatabaseManager {
 
     /**
      * Closes the connection cleanly so H2 releases its file lock.
-     * Call from {@link javafx.application.Application#stop()}.
+     * Thread-safe and idempotent — safe to call multiple times or from shutdown hooks.
      */
-    public void disconnect() {
+    public synchronized void disconnect() {
+        if (shutdownHook != null) {
+            try {
+                Runtime.getRuntime().removeShutdownHook(shutdownHook);
+            } catch (IllegalStateException ignored) {
+                // JVM already shutting down
+            }
+            shutdownHook = null;
+        }
+
         if (connection != null) {
             try {
-                connection.close();
-                LOG.info("Database disconnected.");
+                if (!connection.isClosed()) {
+                    connection.close();
+                    LOG.info("Database disconnected.");
+                }
             } catch (SQLException ex) {
                 LOG.log(Level.WARNING, "Error closing database connection", ex);
             } finally {
@@ -142,14 +152,22 @@ public class DatabaseManager {
      */
     private void initSchema() throws SQLException {
         try (Statement st = connection.createStatement()) {
-            st.execute(DDL_NAMES);
-            st.execute(DDL_BANNED);
-            // Schema migration: ensure ban_count exists if table was created in an earlier version
-            st.execute("ALTER TABLE banned_names ADD COLUMN IF NOT EXISTS ban_count INT NOT NULL DEFAULT 1");
             st.execute(DDL_SAVED_NAMES);
-            // Seed saved_names from existing names and banned_names if any
-            st.execute("INSERT INTO saved_names (name) SELECT DISTINCT name FROM names WHERE LOWER(name) NOT IN (SELECT LOWER(name) FROM saved_names)");
-            st.execute("INSERT INTO saved_names (name) SELECT DISTINCT name FROM banned_names WHERE LOWER(name) NOT IN (SELECT LOWER(name) FROM saved_names)");
+            st.execute(DDL_BANNED);
+
+            // Migrations: ensure columns exist for existing databases
+            st.execute("ALTER TABLE banned_names ADD COLUMN IF NOT EXISTS ban_count INT NOT NULL DEFAULT 1");
+            st.execute("ALTER TABLE saved_names ADD COLUMN IF NOT EXISTS last_used_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP");
+
+            // One-time migration from legacy 'names' table if it existed in previous version
+            try {
+                st.execute("INSERT INTO saved_names (name, last_used_at) " +
+                           "SELECT DISTINCT name, created_at FROM names " +
+                           "WHERE LOWER(name) NOT IN (SELECT LOWER(name) FROM saved_names)");
+                st.execute("DROP TABLE IF EXISTS names");
+            } catch (SQLException ignored) {
+                // Table 'names' did not exist, nothing to migrate
+            }
         }
     }
 }

@@ -96,18 +96,63 @@ class SavedNamesDaoTest {
     }
 
     @Test
-    void automaticSeedFromNamesAndBanned() throws SQLException {
-        NameDao nameDao = new NameDao(db.getConnection());
-        nameDao.insert("David");
+    void recordUsageAddsNewNamesAndUpdatesLastUsedAt() throws SQLException, InterruptedException {
+        dao.recordUsage("Alice");
+        SavedName sn1 = dao.findByName("Alice");
+        assertNotNull(sn1);
+        assertNotNull(sn1.getLastUsedAt());
 
+        Thread.sleep(20);
+        dao.recordUsage("Alice");
+        SavedName sn2 = dao.findByName("Alice");
+        assertNotNull(sn2);
+        assertEquals(1, dao.count(), "Alice should only be saved once in saved_names");
+        assertTrue(sn2.getLastUsedAt().isAfter(sn1.getLastUsedAt()) || sn2.getLastUsedAt().isEqual(sn1.getLastUsedAt()));
+    }
+
+    @Test
+    void recordUsageWithDuplicateParticipantsSavesOnlyOnce() throws SQLException {
+        // Simulates wheel with multiple tickets for the same participant
+        dao.recordUsage(List.of("Alice", "Bob", "Alice", "Bob", "Alice"));
+        assertEquals(2, dao.count(), "Each distinct name should only be saved once");
+        assertNotNull(dao.findByName("Alice"));
+        assertNotNull(dao.findByName("Bob"));
+    }
+
+    @Test
+    void recordBanAlsoSeedsSavedNames() throws SQLException {
         BannedDao bannedDao = new BannedDao(db.getConnection());
         bannedDao.recordBan("Eve");
 
-        // Both David and Eve should have been automatically added to saved_names
         List<SavedName> list = dao.findAll();
         List<String> names = list.stream().map(SavedName::getName).toList();
-
-        assertTrue(names.contains("David"), "David should be in saved_names");
         assertTrue(names.contains("Eve"), "Eve should be in saved_names");
+    }
+
+    @Test
+    void findLastUsedNamesReturnsWithinTwoMinutesInterval() throws SQLException {
+        long now = System.currentTimeMillis();
+        // 5 minutes ago (outside the 2-minute interval)
+        dao.recordUsage("OldCharlie", new java.sql.Timestamp(now - 300_000));
+
+        // 1 minute ago (within the 2-minute interval of the latest usage)
+        dao.recordUsage("RecentDavid", new java.sql.Timestamp(now - 60_000));
+
+        // Latest usage at now
+        java.sql.Timestamp latest = new java.sql.Timestamp(now);
+        dao.recordUsage("Alice", latest);
+        dao.recordUsage("Bob", latest);
+
+        List<String> lastUsed = dao.findLastUsedNames();
+        assertEquals(3, lastUsed.size(), "Should return names used within 2 minutes of the latest usage");
+        assertTrue(lastUsed.contains("Alice"));
+        assertTrue(lastUsed.contains("Bob"));
+        assertTrue(lastUsed.contains("RecentDavid"));
+        assertFalse(lastUsed.contains("OldCharlie"), "Names older than 2 minutes before latest should not be included");
+    }
+
+    @Test
+    void findLastUsedNamesOnEmptyTableReturnsEmptyList() throws SQLException {
+        assertTrue(dao.findLastUsedNames().isEmpty());
     }
 }
