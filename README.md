@@ -63,6 +63,7 @@ mvn javafx:run
 ### 2. Build and Test
 To compile, validate all resources, and run the test suite:
 ```bash
+cd BanRoulette/ban_roulette
 mvn clean verify
 ```
 This executes all 63 unit, integration, and lifecycle tests (including in-memory H2 DAO tests, wheel geometry tests, animation angle math tests, and schema-initialization idempotency tests).
