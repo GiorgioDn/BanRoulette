@@ -1,6 +1,7 @@
 package com.example.db;
 
 import com.example.model.BannedName;
+import com.example.model.Participant;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -13,8 +14,9 @@ import java.util.List;
 /**
  * Data-Access Object for the {@code banned_names} table.
  *
- * <p>Rows are inserted by {@link NameDao#ban} inside a transaction — this DAO
- * never writes outside that context unless called directly (e.g. from tests).
+ * <p>Stores each participant chosen for a ban with their cumulative ban count.
+ * A name is inserted only when it has received at least one ban.
+ * Subsequent bans increment {@code ban_count} and update {@code banned_at}.
  * All queries use {@link PreparedStatement}s and try-with-resources.
  */
 public class BannedDao {
@@ -25,39 +27,65 @@ public class BannedDao {
         this.conn = conn;
     }
 
-    // ── Queries ────────────────────────────────────────────────────────────────
+    // ── Queries & Mutations ───────────────────────────────────────────────────
 
     /**
-     * Inserts a new banned name record.
+     * Records a ban for the given name.
+     * If the name already exists in {@code banned_names}, increments its {@code ban_count}
+     * and updates {@code banned_at}. If it does not exist, inserts it with {@code ban_count = 1}.
      *
-     * <p>Normally called by {@link NameDao#ban} inside a transaction.
-     * The {@code banned_at} timestamp is set automatically by the DB default.
-     *
-     * @param name the name that was just banned
-     * @return the generated primary-key value
+     * @param name the name chosen by the roulette for the ban
+     * @return the updated or newly created {@link BannedName} record
      * @throws SQLException on any JDBC error
      */
-    public long insert(String name) throws SQLException {
-        final String sql = "INSERT INTO banned_names (name) VALUES (?)";
-        try (PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+    public BannedName recordBan(String name) throws SQLException {
+        final String updateSql = """
+                UPDATE banned_names
+                SET ban_count = ban_count + 1,
+                    banned_at = CURRENT_TIMESTAMP
+                WHERE LOWER(name) = LOWER(?)
+                """;
+        try (PreparedStatement ps = conn.prepareStatement(updateSql)) {
             ps.setString(1, name);
-            ps.executeUpdate();
-            try (ResultSet keys = ps.getGeneratedKeys()) {
-                if (keys.next()) return keys.getLong(1);
-                throw new SQLException("INSERT into banned_names returned no generated key");
+            int rows = ps.executeUpdate();
+            if (rows == 0) {
+                final String insertSql = """
+                        INSERT INTO banned_names (name, ban_count, banned_at)
+                        VALUES (?, 1, CURRENT_TIMESTAMP)
+                        """;
+                try (PreparedStatement insertPs = conn.prepareStatement(insertSql, Statement.RETURN_GENERATED_KEYS)) {
+                    insertPs.setString(1, name);
+                    insertPs.executeUpdate();
+                }
             }
         }
+        return findByName(name);
     }
 
     /**
-     * Returns all banned names ordered by ban time (most recent first).
+     * Inserts or increments a banned name record, returning its generated or existing primary key.
+     *
+     * @param name the name that was just banned
+     * @return the primary-key value in {@code banned_names}
+     * @throws SQLException on any JDBC error
+     */
+    public long insert(String name) throws SQLException {
+        BannedName bn = recordBan(name);
+        return (bn != null) ? bn.getId() : 0L;
+    }
+
+    /**
+     * Returns all banned names ordered by ban count (highest first), then by recency.
      *
      * @return an immutable snapshot list; never {@code null}
      * @throws SQLException on any JDBC error
      */
     public List<BannedName> findAll() throws SQLException {
-        final String sql =
-                "SELECT id, name, banned_at FROM banned_names ORDER BY banned_at DESC, id DESC";
+        final String sql = """
+                SELECT id, name, ban_count, banned_at
+                FROM banned_names
+                ORDER BY ban_count DESC, banned_at DESC, id DESC
+                """;
         List<BannedName> result = new ArrayList<>();
         try (PreparedStatement ps = conn.prepareStatement(sql);
              ResultSet rs = ps.executeQuery()) {
@@ -65,6 +93,7 @@ public class BannedDao {
                 result.add(new BannedName(
                         rs.getLong("id"),
                         rs.getString("name"),
+                        rs.getInt("ban_count"),
                         rs.getTimestamp("banned_at").toLocalDateTime()));
             }
         }
@@ -72,8 +101,43 @@ public class BannedDao {
     }
 
     /**
-     * Restores a banned name: deletes the row from {@code banned_names}.
-     * The caller is responsible for re-inserting it into {@code names} if needed.
+     * Looks up a banned name record by name (case-insensitive).
+     *
+     * @param name the name to look for
+     * @return the {@link BannedName} record, or {@code null} if not found
+     * @throws SQLException on any JDBC error
+     */
+    public BannedName findByName(String name) throws SQLException {
+        final String sql = """
+                SELECT id, name, ban_count, banned_at
+                FROM banned_names
+                WHERE LOWER(name) = LOWER(?)
+                """;
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, name);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return new BannedName(
+                            rs.getLong("id"),
+                            rs.getString("name"),
+                            rs.getInt("ban_count"),
+                            rs.getTimestamp("banned_at").toLocalDateTime());
+                }
+                return null;
+            }
+        }
+    }
+
+    /**
+     * Returns the current ban count for a name (or 0 if never banned).
+     */
+    public int getBanCount(String name) throws SQLException {
+        BannedName bn = findByName(name);
+        return (bn != null) ? bn.getBanCount() : 0;
+    }
+
+    /**
+     * Deletes the row from {@code banned_names}, resetting its ban count to 0.
      *
      * @param id the {@code banned_names.id} to delete
      * @throws SQLException on any JDBC error
@@ -105,38 +169,48 @@ public class BannedDao {
     }
 
     /**
-     * Atomically restores a banned name: removes it from {@code banned_names}
-     * and re-inserts it into {@code names} in a single transaction.
+     * Restores a banned name: clears its ban record from {@code banned_names}
+     * and ensures it is present in {@code names}.
      *
      * @param id the {@code banned_names.id} to restore
-     * @param nameDao the DAO used to re-insert into {@code names}
-     * @return a restored {@link com.example.model.Participant} with its newly generated ID
+     * @param nameDao the DAO used to verify or re-insert into {@code names}
+     * @return the {@link Participant} record
      * @throws SQLException on any JDBC error
      */
-    public com.example.model.Participant restore(long id, NameDao nameDao) throws SQLException {
+    public Participant restore(long id, NameDao nameDao) throws SQLException {
         String name = findNameById(id);
-        boolean autoCommit = conn.getAutoCommit();
-        conn.setAutoCommit(false);
-        try {
-            delete(id);
-            long newId = nameDao.insert(name);
-            conn.commit();
-            return new com.example.model.Participant(newId, name);
-        } catch (SQLException ex) {
-            conn.rollback();
-            throw ex;
-        } finally {
-            conn.setAutoCommit(autoCommit);
+        delete(id);
+        // If not already in names table, insert it
+        List<Participant> active = nameDao.findAll();
+        for (Participant p : active) {
+            if (p.getName().equalsIgnoreCase(name)) {
+                return p;
+            }
         }
+        long newId = nameDao.insert(name);
+        return new Participant(newId, name);
     }
 
     /**
-     * Returns the total number of banned names.
+     * Returns the total number of distinct banned names.
      *
      * @throws SQLException on any JDBC error
      */
     public int count() throws SQLException {
         final String sql = "SELECT COUNT(*) FROM banned_names";
+        try (Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery(sql)) {
+            return rs.next() ? rs.getInt(1) : 0;
+        }
+    }
+
+    /**
+     * Returns the total number of bans accumulated across all names.
+     *
+     * @throws SQLException on any JDBC error
+     */
+    public int totalBans() throws SQLException {
+        final String sql = "SELECT COALESCE(SUM(ban_count), 0) FROM banned_names";
         try (Statement st = conn.createStatement();
              ResultSet rs = st.executeQuery(sql)) {
             return rs.next() ? rs.getInt(1) : 0;

@@ -483,4 +483,27 @@
     -fx-background-color: rgba(16, 185, 129, 0.45);
 }
 
+.cell-ban-badge {
+    -fx-background-color: rgba(239, 68, 68, 0.18);
+    -fx-text-fill: #f87171;
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+    -fx-padding: 1 6 1 6;
+    -fx-background-radius: 4;
+    -fx-border-color: rgba(239, 68, 68, 0.35);
+    -fx-border-radius: 4;
+}
+
+.banned-count-pill {
+    -fx-background-color: rgba(239, 68, 68, 0.2);
+    -fx-text-fill: #fca5a5;
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+    -fx-padding: 2 7 2 7;
+    -fx-background-radius: 10;
+    -fx-border-color: rgba(239, 68, 68, 0.4);
+    -fx-border-radius: 10;
+    -fx-alignment: CENTER;
+}
+
 

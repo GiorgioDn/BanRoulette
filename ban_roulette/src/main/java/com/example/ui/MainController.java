@@ -30,6 +30,8 @@ import javafx.scene.control.TableCell;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.util.Duration;
@@ -46,17 +48,15 @@ import java.util.logging.Logger;
 /**
  * Controller for {@code main.fxml} — the primary application window.
  *
- * <p>Responsibilities (Step 3):
+ * <p>Responsibilities:
  * <ul>
- *   <li>Receive a {@link DatabaseManager} via {@link #setDatabaseManager}
- *       (called by {@code App} after FXML loading).</li>
- *   <li>On startup, load saved participants from {@code names} table off the
- *       FX thread and update the UI with {@code Platform.runLater}.</li>
- *   <li>Persist every add / clear to the DB via a background {@link Task}.</li>
- *   <li>Keep the UI fully functional when the DB is unavailable (null guard).</li>
+ *   <li>Manage participants for the roulette wheel.</li>
+ *   <li>When a participant is chosen by the roulette for a ban:
+ *       record/increment their count in {@code banned_names} in H2 without deleting them
+ *       from the active names list or wheel.</li>
+ *   <li>Display both the names used and the banned names with their cumulative count.</li>
+ *   <li>Persist participant additions/deletions and ban counts via background tasks.</li>
  * </ul>
- *
- * <p>Steps 5–7 will wire in the spin animation, hit animation, and ban persistence.
  */
 public class MainController {
 
@@ -86,6 +86,7 @@ public class MainController {
     @FXML private Label                        bannedCountBadge;
     @FXML private TableView<BannedName>        bannedTable;
     @FXML private TableColumn<BannedName, String> bannedNameCol;
+    @FXML private TableColumn<BannedName, String> bannedCountCol;
     @FXML private TableColumn<BannedName, String> bannedDateCol;
     @FXML private TableColumn<BannedName, Void>   bannedActionCol;
     @FXML private Button                       clearBannedBtn;
@@ -106,7 +107,6 @@ public class MainController {
 
     /**
      * The rotating slice {@link Group} most recently built by {@link #refreshWheel()}.
-     * Step 5 reads this to apply the {@link SpinAnimation}.
      */
     private Group currentWheel;
 
@@ -129,7 +129,7 @@ public class MainController {
 
     /**
      * Called by {@link com.example.app.App} right after FXML loading.
-     * Kicks off a background task to load saved names from the database.
+     * Kicks off background tasks to load saved names and banned history from the database.
      *
      * @param dbManager the open database manager; may be {@code null} if the
      *                  DB connection failed (app still works in-memory only)
@@ -147,7 +147,7 @@ public class MainController {
     @FXML
     public void initialize() {
         participantList.setItems(participants);
-        // Pass 'this' so the cell can call back into onRemoveParticipant()
+        // Pass 'this' so the cell can display ban count badge and handle remove
         participantList.setCellFactory(lv -> new ParticipantCell(this));
 
         // Configure Banned TableView (Step 7)
@@ -157,6 +157,28 @@ public class MainController {
             if (bannedNameCol != null) {
                 bannedNameCol.setCellValueFactory(cd ->
                         new SimpleStringProperty(cd.getValue().getName()));
+            }
+
+            if (bannedCountCol != null) {
+                bannedCountCol.setCellValueFactory(cd ->
+                        new SimpleStringProperty(String.valueOf(cd.getValue().getBanCount())));
+                bannedCountCol.setCellFactory(col -> new TableCell<>() {
+                    private final Label countLabel = new Label();
+                    {
+                        countLabel.getStyleClass().add("banned-count-pill");
+                    }
+                    @Override
+                    protected void updateItem(String item, boolean empty) {
+                        super.updateItem(item, empty);
+                        if (empty || item == null) {
+                            setGraphic(null);
+                        } else {
+                            countLabel.setText(item + "×");
+                            setGraphic(countLabel);
+                            setAlignment(Pos.CENTER);
+                        }
+                    }
+                });
             }
 
             if (bannedDateCol != null) {
@@ -169,11 +191,11 @@ public class MainController {
 
             if (bannedActionCol != null) {
                 bannedActionCol.setCellFactory(col -> new TableCell<>() {
-                    private final Button restoreBtn = new Button("Restore");
+                    private final Button resetBtn = new Button("Reset");
                     {
-                        restoreBtn.getStyleClass().add("btn-restore");
-                        restoreBtn.setFocusTraversable(false);
-                        restoreBtn.setOnAction(e -> {
+                        resetBtn.getStyleClass().add("btn-restore");
+                        resetBtn.setFocusTraversable(false);
+                        resetBtn.setOnAction(e -> {
                             BannedName item = getTableView().getItems().get(getIndex());
                             if (item != null) {
                                 onRestoreParticipant(item);
@@ -183,7 +205,7 @@ public class MainController {
                     @Override
                     protected void updateItem(Void item, boolean empty) {
                         super.updateItem(item, empty);
-                        setGraphic(empty ? null : restoreBtn);
+                        setGraphic(empty ? null : resetBtn);
                         setAlignment(Pos.CENTER);
                     }
                 });
@@ -335,7 +357,7 @@ public class MainController {
             flashStatus("⚡ Ban hammer incoming for " + currentWinner.getName() + "…");
             bottomStatus.setText("Hammer strike incoming…");
 
-            // Step 6: Trigger the ban hammer hit sequence
+            // Trigger the ban hammer hit sequence
             playHammerHitAnimation(currentWinner);
         });
 
@@ -343,17 +365,15 @@ public class MainController {
     }
 
     /**
-     * Executes Step 6: loads the hammer SVG, places it above the winning slice,
-     * runs the wind-up -> strike -> impact shake -> retreat sequence, and shows
-     * the result dialog on completion.
+     * Executes the hammer strike animation.
+     * When completed, records/increments the ban count in {@code banned_names} without
+     * deleting the participant from active names or the wheel, and displays the result dialog.
      */
     void playHammerHitAnimation(Participant winner) {
         Group hammer = hammerLoader.loadHammer();
-        // Position hammer above-right of the 12 o'clock pointer so the strike swings into the slice
         hammer.setTranslateX(110.0);
         hammer.setTranslateY(-380.0);
 
-        // Add above wheel/pointer but behind the dialog overlay
         int overlayIdx = (banDialogOverlay != null)
                 ? wheelContainer.getChildren().indexOf(banDialogOverlay) : -1;
         if (overlayIdx >= 0) {
@@ -365,50 +385,76 @@ public class MainController {
         SequentialTransition hit = hitAnimation.buildHit(hammer, currentWheel, () -> {
             wheelContainer.getChildren().remove(hammer);
 
-            // Step 7: Persist the ban and tie everything together
-            // 1. Remove from active participants in memory
-            participants.remove(winner);
-
-            // 2. Add to banned list in memory
-            BannedName bannedRecord = new BannedName(0, winner.getName(), LocalDateTime.now());
-            bannedList.add(0, bannedRecord);
-            if (bannedCountBadge != null) {
-                bannedCountBadge.setText(String.valueOf(bannedList.size()));
-            }
-
-            // 3. Redraw the wheel without the banned name; if fewer than 2 remain, spinning is disabled
-            refreshWheel();
-            updateUI();
-
-            // 4. In background: persist ban in a SINGLE transaction (atomic move)
+            // Record the ban without deleting from participants or names table
             if (dbManager != null && dbManager.getConnection() != null) {
-                Task<Void> banTask = new Task<>() {
-                    @Override protected Void call() throws Exception {
-                        Connection conn = dbManager.getConnection();
-                        NameDao nameDao = new NameDao(conn);
-                        BannedDao bannedDao = new BannedDao(conn);
-                        if (winner.getId() > 0) {
-                            nameDao.ban(winner.getId(), bannedDao);
-                        } else {
-                            bannedDao.insert(winner.getName());
-                        }
-                        return null;
+                Task<BannedName> banTask = new Task<>() {
+                    @Override protected BannedName call() throws Exception {
+                        BannedDao bannedDao = new BannedDao(dbManager.getConnection());
+                        return bannedDao.recordBan(winner.getName());
                     }
                 };
-                banTask.setOnSucceeded(ev -> loadBannedFromDb());
-                banTask.setOnFailed(ev ->
-                        LOG.log(Level.WARNING, "Failed to persist ban in single transaction", banTask.getException()));
+                banTask.setOnSucceeded(ev -> {
+                    BannedName record = banTask.getValue();
+                    int count = (record != null) ? record.getBanCount() : 1;
+                    loadBannedFromDb();
+                    participantList.refresh();
+                    showBanDialog(winner.getName(), count);
+                });
+                banTask.setOnFailed(ev -> {
+                    LOG.log(Level.WARNING, "Failed to persist ban in DB", banTask.getException());
+                    int count = updateInMemoryBan(winner.getName());
+                    participantList.refresh();
+                    showBanDialog(winner.getName(), count);
+                });
                 new Thread(banTask, "db-ban").start();
+            } else {
+                int count = updateInMemoryBan(winner.getName());
+                participantList.refresh();
+                showBanDialog(winner.getName(), count);
             }
 
-            // 5. Show ban dialog overlay
-            showBanDialog(winner.getName());
-            flashStatus("🔨 " + winner.getName() + " has been banned!");
-            bottomStatus.setText("Banned: " + winner.getName() +
-                    (participants.size() < 2 ? " · need at least 2 participants to spin" : " · ready"));
+            flashStatus("🔨 " + winner.getName() + " was chosen by the roulette!");
+            bottomStatus.setText("Selected: " + winner.getName() + " · ready for next spin");
         });
 
         hit.play();
+    }
+
+    private int updateInMemoryBan(String name) {
+        for (BannedName bn : bannedList) {
+            if (bn.getName().equalsIgnoreCase(name)) {
+                bn.incrementCount();
+                bn.setBannedAt(LocalDateTime.now());
+                if (bannedTable != null) bannedTable.refresh();
+                updateBannedCountBadge();
+                return bn.getBanCount();
+            }
+        }
+        BannedName newRecord = new BannedName(0, name, 1, LocalDateTime.now());
+        bannedList.add(0, newRecord);
+        updateBannedCountBadge();
+        return 1;
+    }
+
+    private void updateBannedCountBadge() {
+        if (bannedCountBadge != null) {
+            int total = 0;
+            for (BannedName bn : bannedList) {
+                total += bn.getBanCount();
+            }
+            bannedCountBadge.setText(String.valueOf(total));
+        }
+    }
+
+    /** Returns the current ban count for a name, or 0 if never chosen for a ban. */
+    public int getBanCountFor(String name) {
+        if (name == null) return 0;
+        for (BannedName bn : bannedList) {
+            if (name.equalsIgnoreCase(bn.getName())) {
+                return bn.getBanCount();
+            }
+        }
+        return 0;
     }
 
     // ── Private helpers ────────────────────────────────────────────────────────
@@ -461,9 +507,8 @@ public class MainController {
             List<BannedName> saved = loadTask.getValue();
             Platform.runLater(() -> {
                 bannedList.setAll(saved);
-                if (bannedCountBadge != null) {
-                    bannedCountBadge.setText(String.valueOf(saved.size()));
-                }
+                updateBannedCountBadge();
+                participantList.refresh();
             });
         });
 
@@ -474,7 +519,6 @@ public class MainController {
     }
 
     private void refreshWheel() {
-        // Remove old wheel group and old pointer (anything that is not the placeholder VBox)
         wheelContainer.getChildren().removeIf(
                 n -> n instanceof Group || "wheel-pointer".equals(n.getId()));
 
@@ -492,19 +536,15 @@ public class MainController {
             }
             wheelPlaceholder.setVisible(false);
 
-            // generateWheel() returns a Group containing slices, labels, dividers
-            // AND the pointer as its last child. We pull the pointer out so it stays
-            // stationary while only the slice group rotates (Step 5).
             Group full    = wheelGenerator.generateWheel(participants, WheelGenerator.DEFAULT_RADIUS);
             int   lastIdx = full.getChildren().size() - 1;
-            var   pointer = full.getChildren().remove(lastIdx); // the pointer SVGPath
+            var   pointer = full.getChildren().remove(lastIdx);
             pointer.setId("wheel-pointer");
 
-            currentWheel = full; // the rotating part
+            currentWheel = full;
             currentWheel.setCursor(Cursor.HAND);
             currentPointerNode = pointer;
 
-            // wheel first, fixed pointer on top
             wheelContainer.getChildren().add(0, currentWheel);
             wheelContainer.getChildren().add(pointer);
         }
@@ -578,7 +618,7 @@ public class MainController {
         }
     }
 
-    /** Returns the currently displayed wheel Group (used by SpinAnimation in Step 5). */
+    /** Returns the currently displayed wheel Group. */
     public Group getCurrentWheel() { return currentWheel; }
 
     /** Returns whether a spin animation is currently active. */
@@ -593,52 +633,32 @@ public class MainController {
     /** Returns the banned names TableView. */
     public TableView<BannedName> getBannedTable() { return bannedTable; }
 
-    // ── Restore & Banned actions (Step 7) ──────────────────────────────────────
+    // ── Restore & Banned actions ──────────────────────────────────────────────
 
     /**
-     * Restores a banned participant: removes them from the banned list,
-     * re-adds them to the active participants list, redraws the wheel,
-     * and performs the atomic DB restore in the background.
+     * Resets a banned participant's count: removes them from the banned list
+     * and clears the ban record in the database.
      */
     void onRestoreParticipant(BannedName item) {
         if (isSpinning || item == null) {
             return;
         }
 
-        // 1. Remove from banned list
         bannedList.remove(item);
-        if (bannedCountBadge != null) {
-            bannedCountBadge.setText(String.valueOf(bannedList.size()));
-        }
+        updateBannedCountBadge();
+        participantList.refresh();
+        flashStatus("Reset ban count for \u201c" + item.getName() + "\u201d.");
 
-        // 2. Add back to active participants
-        Participant restored = new Participant(item.getName());
-        participants.add(restored);
-
-        // 3. Redraw wheel and update UI
-        refreshWheel();
-        updateUI();
-        flashStatus("Restored \u201c" + item.getName() + "\u201d to the wheel.");
-
-        // 4. Background DB atomic restore transaction
         if (dbManager != null && dbManager.getConnection() != null) {
-            Task<Long> restoreTask = new Task<>() {
-                @Override protected Long call() throws Exception {
-                    Connection conn = dbManager.getConnection();
-                    BannedDao bannedDao = new BannedDao(conn);
-                    NameDao nameDao = new NameDao(conn);
-                    if (item.getId() > 0) {
-                        Participant p = bannedDao.restore(item.getId(), nameDao);
-                        return p.getId();
-                    } else {
-                        return nameDao.insert(item.getName());
-                    }
+            Task<Void> deleteTask = new Task<>() {
+                @Override protected Void call() throws Exception {
+                    new BannedDao(dbManager.getConnection()).delete(item.getId());
+                    return null;
                 }
             };
-            restoreTask.setOnSucceeded(e -> restored.setId(restoreTask.getValue()));
-            restoreTask.setOnFailed(e ->
-                    LOG.log(Level.WARNING, "Failed to restore participant in DB", restoreTask.getException()));
-            new Thread(restoreTask, "db-restore").start();
+            deleteTask.setOnFailed(e ->
+                    LOG.log(Level.WARNING, "Failed to reset ban in DB", deleteTask.getException()));
+            new Thread(deleteTask, "db-delete-banned").start();
         }
     }
 
@@ -651,6 +671,7 @@ public class MainController {
         if (bannedCountBadge != null) {
             bannedCountBadge.setText("0");
         }
+        participantList.refresh();
         flashStatus("Banned history cleared.");
 
         if (dbManager != null && dbManager.getConnection() != null) {
@@ -678,14 +699,15 @@ public class MainController {
         }
     }
 
-    // ── Ban dialog display & dismiss (Step 6) ──────────────────────────────────
+    // ── Ban dialog display & dismiss ──────────────────────────────────────────
 
     /**
-     * Displays the result dialog overlay announcing the banned participant.
+     * Displays the result dialog overlay announcing the participant chosen for ban and their count.
      */
-    public void showBanDialog(String name) {
+    public void showBanDialog(String name, int banCount) {
         if (banDialogMessage != null) {
-            banDialogMessage.setText(name + " has been banned!");
+            String suffix = (banCount > 1) ? ("\n(Ban count: " + banCount + "×)") : "\n(First ban!)";
+            banDialogMessage.setText(name + " has been chosen for a ban!" + suffix);
         }
         if (banDialogOverlay != null) {
             banDialogOverlay.setOpacity(0.0);
@@ -701,6 +723,13 @@ public class MainController {
             setUiSpinningState(false);
             updateUI();
         }
+    }
+
+    /**
+     * Displays the result dialog overlay announcing the participant chosen for ban.
+     */
+    public void showBanDialog(String name) {
+        showBanDialog(name, getBanCountFor(name));
     }
 
     /**
@@ -739,7 +768,8 @@ public class MainController {
     // ── Inner cell factory ─────────────────────────────────────────────────────
 
     /**
-     * Renders each participant as a row with a name label and a × remove button.
+     * Renders each participant as a row with a name label, an optional ban count badge,
+     * and a × remove button.
      */
     private static class ParticipantCell extends ListCell<Participant> {
 
@@ -756,21 +786,31 @@ public class MainController {
                 setText(null);
                 setGraphic(null);
             } else {
-                javafx.scene.control.Label nameLabel =
-                        new javafx.scene.control.Label(item.getName());
+                Label nameLabel = new Label(item.getName());
                 nameLabel.setMaxWidth(Double.MAX_VALUE);
                 nameLabel.getStyleClass().add("cell-name-label");
 
-                javafx.scene.control.Button removeBtn =
-                        new javafx.scene.control.Button("\u00d7");
+                int banCount = controller.getBanCountFor(item.getName());
+                Label banBadge = null;
+                if (banCount > 0) {
+                    banBadge = new Label("🔨 " + banCount);
+                    banBadge.getStyleClass().add("cell-ban-badge");
+                }
+
+                Button removeBtn = new Button("\u00d7");
                 removeBtn.getStyleClass().add("btn-cell-remove");
                 removeBtn.setOnAction(e -> controller.onRemoveParticipant(item));
                 removeBtn.setFocusTraversable(false);
 
-                javafx.scene.layout.HBox row = new javafx.scene.layout.HBox(nameLabel, removeBtn);
+                HBox row;
+                if (banBadge != null) {
+                    row = new HBox(8, nameLabel, banBadge, removeBtn);
+                } else {
+                    row = new HBox(8, nameLabel, removeBtn);
+                }
                 row.getStyleClass().add("cell-row");
-                javafx.scene.layout.HBox.setHgrow(nameLabel, javafx.scene.layout.Priority.ALWAYS);
-                row.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+                HBox.setHgrow(nameLabel, Priority.ALWAYS);
+                row.setAlignment(Pos.CENTER_LEFT);
 
                 setText(null);
                 setGraphic(row);

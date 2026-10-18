@@ -32,10 +32,10 @@ class BannedDaoTest {
     void setUp() throws SQLException {
         bannedDao = new BannedDao(db.getConnection());
         // Clean table before each test
-        db.getConnection().createStatement().execute("DELETE FROM banned_names");
+        bannedDao.deleteAll();
     }
 
-    // ── insert ─────────────────────────────────────────────────────────────────
+    // ── insert & recordBan ─────────────────────────────────────────────────────
 
     @Test
     @Order(1)
@@ -46,68 +46,102 @@ class BannedDaoTest {
 
     @Test
     @Order(2)
-    void insertedNameAppearsInFindAll() throws SQLException {
+    void insertedNameAppearsInFindAllWithCountOne() throws SQLException {
         bannedDao.insert("Frank");
         List<BannedName> all = bannedDao.findAll();
         assertEquals(1, all.size());
         assertEquals("Frank", all.get(0).getName());
+        assertEquals(1, all.get(0).getBanCount());
+    }
+
+    @Test
+    @Order(3)
+    void recordBanIncrementsCountForExistingName() throws SQLException {
+        bannedDao.recordBan("George");
+        assertEquals(1, bannedDao.getBanCount("George"));
+
+        bannedDao.recordBan("George");
+        assertEquals(2, bannedDao.getBanCount("George"));
+
+        bannedDao.recordBan("George");
+        assertEquals(3, bannedDao.getBanCount("George"));
+
+        // Still only 1 distinct row in the table
+        assertEquals(1, bannedDao.count());
     }
 
     // ── findAll ────────────────────────────────────────────────────────────────
 
     @Test
-    @Order(3)
+    @Order(4)
     void findAllOnEmptyTableReturnsEmptyList() throws SQLException {
         assertTrue(bannedDao.findAll().isEmpty());
     }
 
     @Test
-    @Order(4)
-    void findAllReturnsMostRecentFirst() throws SQLException {
-        bannedDao.insert("OldBan");
-        // Tiny sleep so timestamps differ (H2 TIMESTAMP precision is milliseconds)
-        try { Thread.sleep(5); } catch (InterruptedException ignored) { }
-        bannedDao.insert("NewBan");
+    @Order(5)
+    void findAllOrdersByBanCountDescending() throws SQLException {
+        bannedDao.recordBan("LowBan");
+        bannedDao.recordBan("HighBan");
+        bannedDao.recordBan("HighBan");
+        bannedDao.recordBan("HighBan");
+
         List<BannedName> all = bannedDao.findAll();
         assertEquals(2, all.size());
-        assertEquals("NewBan", all.get(0).getName(), "Most recently banned should be first");
-        assertEquals("OldBan", all.get(1).getName());
+        assertEquals("HighBan", all.get(0).getName());
+        assertEquals(3, all.get(0).getBanCount());
+        assertEquals("LowBan", all.get(1).getName());
+        assertEquals(1, all.get(1).getBanCount());
     }
 
-    // ── count ──────────────────────────────────────────────────────────────────
+    // ── count & totalBans ──────────────────────────────────────────────────────
 
     @Test
-    @Order(5)
-    void countReflectsInserts() throws SQLException {
+    @Order(6)
+    void countReflectsDistinctNames() throws SQLException {
         assertEquals(0, bannedDao.count());
-        bannedDao.insert("Grace");
+        bannedDao.recordBan("Grace");
         assertEquals(1, bannedDao.count());
-        bannedDao.insert("Heidi");
+        bannedDao.recordBan("Grace");
+        assertEquals(1, bannedDao.count()); // same name, still 1 distinct
+        bannedDao.recordBan("Heidi");
         assertEquals(2, bannedDao.count());
+    }
+
+    @Test
+    @Order(7)
+    void totalBansSumsAllCounts() throws SQLException {
+        assertEquals(0, bannedDao.totalBans());
+        bannedDao.recordBan("A"); // 1
+        bannedDao.recordBan("A"); // 2
+        bannedDao.recordBan("B"); // 1
+        bannedDao.recordBan("C"); // 1
+        assertEquals(4, bannedDao.totalBans());
     }
 
     // ── delete ─────────────────────────────────────────────────────────────────
 
     @Test
-    @Order(6)
+    @Order(8)
     void deleteRemovesBannedName() throws SQLException {
         long id = bannedDao.insert("Ivan");
         bannedDao.delete(id);
         assertTrue(bannedDao.findAll().isEmpty());
+        assertEquals(0, bannedDao.getBanCount("Ivan"));
     }
 
     @Test
-    @Order(7)
+    @Order(9)
     void deleteMissingIdIsNoOp() {
         assertDoesNotThrow(() -> bannedDao.delete(99_999L),
                 "Deleting a non-existent id should be a silent no-op");
     }
 
-    // ── restore (transactional move back to names) ────────────────────────────
+    // ── restore (reset ban and ensure presence in names) ───────────────────────
 
     @Test
-    @Order(8)
-    void restoreMovesBannedNameToNamesTable() throws SQLException {
+    @Order(10)
+    void restoreResetsBanRecord() throws SQLException {
         NameDao nameDao = new NameDao(db.getConnection());
         nameDao.deleteAll();
 
@@ -117,9 +151,8 @@ class BannedDaoTest {
         com.example.model.Participant restored = bannedDao.restore(id, nameDao);
         assertNotNull(restored);
         assertEquals("Judy", restored.getName());
-        assertTrue(restored.getId() > 0);
 
-        // Should be removed from banned_names
+        // Should be removed from banned_names (count reset to 0)
         assertEquals(0, bannedDao.count());
         assertTrue(bannedDao.findAll().isEmpty());
 
@@ -129,18 +162,10 @@ class BannedDaoTest {
         assertEquals("Judy", participants.get(0).getName());
     }
 
-    @Test
-    @Order(9)
-    void restoreNonExistentIdThrows() {
-        NameDao nameDao = new NameDao(db.getConnection());
-        assertThrows(SQLException.class, () -> bannedDao.restore(99_999L, nameDao),
-                "Restoring a non-existent banned id should throw SQLException");
-    }
-
     // ── deleteAll ──────────────────────────────────────────────────────────────
 
     @Test
-    @Order(10)
+    @Order(11)
     void deleteAllClearsAllBannedNames() throws SQLException {
         bannedDao.insert("Ban1");
         bannedDao.insert("Ban2");

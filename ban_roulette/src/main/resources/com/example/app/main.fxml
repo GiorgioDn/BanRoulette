@@ -136,7 +136,7 @@
 
     <!-- ══ RIGHT SIDEBAR — BANNED LIST (Step 7) ══════════════════════ -->
     <right>
-        <VBox fx:id="rightSidebar" styleClass="sidebar-right" prefWidth="320.0">
+        <VBox fx:id="rightSidebar" styleClass="sidebar-right" prefWidth="340.0">
             <!-- Brand / Header -->
             <VBox styleClass="sidebar-header" spacing="4.0">
                 <padding><Insets top="28.0" right="20.0" bottom="20.0" left="20.0"/></padding>
@@ -159,13 +159,16 @@
                     <columns>
                         <TableColumn fx:id="bannedNameCol"
                                      text="Name"
-                                     prefWidth="110.0"/>
+                                     prefWidth="105.0"/>
+                        <TableColumn fx:id="bannedCountCol"
+                                     text="Bans"
+                                     prefWidth="65.0"/>
                         <TableColumn fx:id="bannedDateCol"
-                                     text="Date"
+                                     text="Last Ban"
                                      prefWidth="85.0"/>
                         <TableColumn fx:id="bannedActionCol"
                                      text="Action"
-                                     prefWidth="75.0"/>
+                                     prefWidth="65.0"/>
                     </columns>
                     <placeholder>
                         <Label text="No banned participants yet" styleClass="table-placeholder"/>

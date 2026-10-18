@@ -63,7 +63,8 @@ public class DatabaseManager {
     private static final String DDL_BANNED = """
             CREATE TABLE IF NOT EXISTS banned_names (
                 id        IDENTITY PRIMARY KEY,
-                name      VARCHAR(100) NOT NULL,
+                name      VARCHAR(100) NOT NULL UNIQUE,
+                ban_count INT NOT NULL DEFAULT 1,
                 banned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
             """;
@@ -135,6 +136,8 @@ public class DatabaseManager {
         try (Statement st = connection.createStatement()) {
             st.execute(DDL_NAMES);
             st.execute(DDL_BANNED);
+            // Schema migration: ensure ban_count exists if table was created in an earlier version
+            st.execute("ALTER TABLE banned_names ADD COLUMN IF NOT EXISTS ban_count INT NOT NULL DEFAULT 1");
         }
     }
 }

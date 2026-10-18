@@ -92,31 +92,30 @@ public class NameDao {
      * Bans a participant: atomically removes them from {@code names} and
      * inserts them into {@code banned_names} via {@code bannedDao}.
      *
-     * <p>The operation runs inside a single transaction.  If either statement
-     * fails the connection is rolled back, so the two tables stay consistent.
+     * <p>Records the ban in {@code banned_names} (incrementing its ban count)
+     * without deleting the participant from {@code names}, allowing the participant
+     * to remain in use and on the wheel.
      *
-     * @param id       the {@code names.id} of the participant to ban
-     * @param bannedDao the DAO used to insert into {@code banned_names}
-     * @return the participant's name (handy for showing the result dialog)
+     * @param id        the {@code names.id} of the participant to ban
+     * @param bannedDao the DAO used to record into {@code banned_names}
+     * @return the participant's name
      * @throws SQLException if no row with {@code id} exists, or on any JDBC error
      */
     public String ban(long id, BannedDao bannedDao) throws SQLException {
-        // Read the name first (outside the transaction — just a SELECT)
         String name = findNameById(id);
+        bannedDao.recordBan(name);
+        return name;
+    }
 
-        boolean autoCommit = conn.getAutoCommit();
-        conn.setAutoCommit(false);
-        try {
-            delete(id);
-            bannedDao.insert(name);
-            conn.commit();
-            return name;
-        } catch (SQLException ex) {
-            conn.rollback();
-            throw ex;
-        } finally {
-            conn.setAutoCommit(autoCommit);
-        }
+    /**
+     * Records a ban for the given name in {@code banned_names} without deleting it from {@code names}.
+     *
+     * @param name      the name of the participant to ban
+     * @param bannedDao the DAO used to record into {@code banned_names}
+     * @throws SQLException on any JDBC error
+     */
+    public void ban(String name, BannedDao bannedDao) throws SQLException {
+        bannedDao.recordBan(name);
     }
 
     /**

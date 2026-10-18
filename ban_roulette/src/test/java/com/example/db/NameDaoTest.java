@@ -115,20 +115,35 @@ class NameDaoTest {
         assertTrue(nameDao.findAll().isEmpty());
     }
 
-    // ── ban (transactional move) ───────────────────────────────────────────────
+    // ── ban (record ban without deleting from names) ──────────────────────────
 
     @Test
     @Order(8)
-    void banMovesParticipantToBannedTable() throws SQLException {
-        long id   = nameDao.insert("Diana");
+    void banRecordsInBannedTableWithoutDeletingFromNames() throws SQLException {
+        long id = nameDao.insert("Diana");
         String returned = nameDao.ban(id, bannedDao);
 
         assertEquals("Diana", returned, "ban() should return the participant's name");
-        assertTrue(nameDao.findAll().isEmpty(),
-                "Participant should be removed from names");
+        // Participant remains in names (not deleted)
+        assertEquals(1, nameDao.findAll().size(),
+                "Participant should NOT be removed from names");
+        assertEquals("Diana", nameDao.findAll().get(0).getName());
+
+        // Participant appears in banned_names with count 1
         assertEquals(1, bannedDao.count(),
                 "Participant should appear in banned_names");
         assertEquals("Diana", bannedDao.findAll().get(0).getName());
+        assertEquals(1, bannedDao.findAll().get(0).getBanCount());
+
+        // Subsequent ban increments count, still does not delete
+        nameDao.ban(id, bannedDao);
+        assertEquals(1, nameDao.findAll().size());
+        assertEquals(2, bannedDao.getBanCount("Diana"));
+
+        // Reinserting name is not blocked
+        assertDoesNotThrow(() -> nameDao.insert("Diana"),
+                "Reinserting the banned name should not be blocked");
+        assertEquals(2, nameDao.findAll().size());
     }
 
     @Test
