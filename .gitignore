@@ -10,12 +10,18 @@ buildNumber.properties
 .mvn/timing.properties
 .mvn/wrapper/maven-wrapper.jar
 
+# ---------- Gradle build output ----------
+.gradle/
+build/
+
 # ---------- Java ----------
 *.class
 *.log
 *.ctxt
 .mtj.tmp/
 *.jar
+!gradle-wrapper.jar
+!**/gradle/wrapper/gradle-wrapper.jar
 *.war
 *.nar
 *.ear

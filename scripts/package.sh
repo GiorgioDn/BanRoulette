@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # scripts/package.sh — macOS (.pkg) and Linux (.deb) jpackage wrapper
 # Usage: bash scripts/package.sh  (from the repo root)
-# Requires: JDK 21+, mvn package already run (target/jpackage-input/ must exist)
+# Requires: JDK 21+, ./gradlew build already run (build/jpackage-input/ must exist)
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_DIR="${SCRIPT_DIR}/../ban_roulette"
-INPUT_DIR="${PROJECT_DIR}/target/jpackage-input"
-OUTPUT_DIR="${PROJECT_DIR}/target/installer"
+PROJECT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+INPUT_DIR="${PROJECT_DIR}/build/jpackage-input"
+OUTPUT_DIR="${PROJECT_DIR}/build/installer"
 MAIN_CLASS="com.example.app.AppLauncher"
 APP_NAME="BanRoulette"
 
@@ -34,7 +34,7 @@ esac
 echo "==> Packaging ${APP_NAME} as .${PKG_TYPE} ..."
 mkdir -p "${OUTPUT_DIR}"
 
-# Icon path (optional — add ban_roulette/src/main/resources/icon.icns or icon.png later)
+# Icon path (optional — add src/main/resources/icon.icns or icon.png later)
 ICON_ARG=""
 ICON_ICNS="${PROJECT_DIR}/src/main/resources/icon.icns"
 ICON_PNG="${PROJECT_DIR}/src/main/resources/icon.png"

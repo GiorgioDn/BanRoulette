@@ -3,6 +3,7 @@
 [![Build & Release](https://github.com/GiorgioDn/BanRoulette/actions/workflows/deploy.yml/badge.svg)](https://github.com/GiorgioDn/BanRoulette/actions/workflows/deploy.yml)
 [![Java](https://img.shields.io/badge/Java-21-orange.svg)](https://adoptium.net/)
 [![JavaFX](https://img.shields.io/badge/JavaFX-21.0.3-blue.svg)](https://openjfx.io/)
+[![Gradle](https://img.shields.io/badge/Gradle-8.11-02303A.svg?logo=gradle)](https://gradle.org/)
 [![H2 Database](https://img.shields.io/badge/Database-H2%20Embedded-informational.svg)](https://www.h2database.com/)
 
 A modern, high-polish desktop application built with **Java 21** and **JavaFX** that adds excitement and fairness to choosing people for a ban. Spin the colorful segmented roulette wheel, watch the dramatic SVG Ban Hammer strike the selected slice, and track cumulative bans across sessions.
@@ -41,7 +42,7 @@ A modern, high-polish desktop application built with **Java 21** and **JavaFX** 
   - Backed by an embedded H2 database with strictly two tables (`saved_names` and `banned_names`) with automatic schema initialization and migration.
   - Graceful fallback: runs seamlessly in in-memory mode if the database file is unavailable.
 - **Native Standalone Installers**:
-  - Packaged via `jpackage` with bundled Java runtime — users do not need Maven or Java pre-installed.
+  - Packaged via `jpackage` with bundled Java runtime — users do not need Gradle, Maven, or Java pre-installed.
 
 ---
 
@@ -53,26 +54,30 @@ A modern, high-polish desktop application built with **Java 21** and **JavaFX** 
   - **Linux**: Ubuntu 20.04+, Debian 11+, or any distribution supporting `.deb`
 - **To build from source**:
   - **JDK 21** or later (e.g. Eclipse Temurin)
-  - **Apache Maven 3.9+**
+  - **Gradle Wrapper** (`./gradlew`) is included — no manual Gradle installation required.
 
 ---
 
 ## 🚀 Getting Started
 
-### 1. Run Locally with Maven
+### 1. Run Locally with Gradle
 To launch the application in development mode:
 ```bash
 git clone https://github.com/GiorgioDn/BanRoulette.git
-cd BanRoulette/ban_roulette
-mvn javafx:run
+cd BanRoulette
+./gradlew run
 ```
+*(On Windows PowerShell / CMD: `.\gradlew.bat run`)*
 
 ### 2. Build and Test
 To compile, validate all resources, and run the test suite:
 ```bash
-cd BanRoulette/ban_roulette
-mvn clean verify
+./gradlew check
+# or build everything including the jpackage staging:
+./gradlew build
 ```
+*(On Windows PowerShell / CMD: `.\gradlew.bat build`)*
+
 This executes all 74 unit, integration, and lifecycle tests (including in-memory H2 DAO tests, saved names catalog tests, wheel geometry tests, animation angle math tests, and schema-initialization idempotency tests).
 
 ---
@@ -100,32 +105,32 @@ The application uses `jpackage` to bundle the application JAR, JavaFX runtime, a
 
 ### Local Packaging
 
-Make sure `mvn package` or `mvn verify` has been run first to stage `ban_roulette/target/jpackage-input/`.
+Make sure `./gradlew assemble` or `./gradlew build` has been run first to stage `build/jpackage-input/`.
 
 - **macOS (`.pkg`)**:
   ```bash
   bash scripts/package.sh
   ```
-  Produces `ban_roulette/target/installer/BanRoulette-1.0.0.pkg`.
+  Produces `build/installer/BanRoulette-1.0.0.pkg`.
 
 - **Windows (`.exe`)**:
   ```powershell
   pwsh scripts/package.ps1
   ```
-  Produces `ban_roulette/target/installer/BanRoulette-1.0.0.exe` (requires WiX Toolset).
+  Produces `build/installer/BanRoulette-1.0.0.exe` (requires WiX Toolset).
 
 - **Linux (`.deb`)**:
   ```bash
   bash scripts/package.sh
   ```
-  Produces `ban_roulette/target/installer/banroulette_1.0.0_amd64.deb`.
+  Produces `build/installer/banroulette_1.0.0_amd64.deb`.
 
 ### Continuous Integration & Release (GitHub Actions)
 The workflow located at [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) automatically triggers on pushes to `main`:
 1. **Multi-Platform Matrix Build**: Compiles and verifies the project on `ubuntu-latest`, `macos-latest`, and `windows-latest`.
-2. **Quality Gate**: Runs `mvn -B verify` — any failing test immediately halts the pipeline.
-3. **Installer Packaging**: Runs platform packaging scripts to generate `.pkg`, `.exe`, and `.deb` installers.
-4. **Predictable Release Tagging**: Reads the project version from `ban_roulette/pom.xml` (e.g. `1.0.0`) and publishes a GitHub Release tagged `v1.0.0` attaching all three native installer binaries.
+2. **Quality Gate**: Runs `./gradlew build --no-daemon` — any failing test immediately halts the pipeline.
+3. **Installer Packaging**: Runs platform packaging scripts to generate `.pkg`, `.exe`, and `.deb` installers from `build/jpackage-input/`.
+4. **Predictable Release Tagging**: Reads the project version from `build.gradle.kts` (e.g. `1.0.0`) and publishes a GitHub Release tagged `v1.0.0` attaching all three native installer binaries.
 
 > [!NOTE]
 > **Bypassing Unsigned Installer Warnings**:
