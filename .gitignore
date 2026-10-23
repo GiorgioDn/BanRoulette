@@ -13,8 +13,12 @@ buildNumber.properties
 # ---------- Gradle build output ----------
 .gradle/
 build/
+gradle-app.setting
+.gradletasknamecache
+local.properties
 
-# ---------- Java ----------
+# ---------- Java / Kotlin compiled output ----------
+.kotlin/
 *.class
 *.log
 *.ctxt
@@ -31,7 +35,22 @@ build/
 hs_err_pid*
 replay_pid*
 
-# ---------- Native installers (jpackage output) ----------
+# ---------- Android build artifacts ----------
+*.apk
+*.aab
+*.aar
+*.ap_
+*.dex
+output-metadata.json
+captures/
+.externalNativeBuild/
+.cxx/
+lint/intermediates/
+lint/generated/
+lint/outputs/
+lint/tmp/
+
+# ---------- Desktop native installers (jpackage output) ----------
 dist/
 installers/
 *.dmg
@@ -54,6 +73,7 @@ installers/
 .idea/
 *.iml
 *.iws
+*.ipr
 .vscode/
 .classpath
 .project
@@ -72,14 +92,18 @@ Thumbs.db
 ehthumbs.db
 Desktop.ini
 
-# ---------- Secrets and local config ----------
+# ---------- Secrets, signing and local config ----------
 .env
+.env.*
 *.pem
 *.p12
 *.key
 *.keystore
 *.jks
+keystore.properties
+keystore.base64
+play-service-account*.json
 local.properties
 
 # ---------- Personal file ----------
-plan.md
+plans.md
