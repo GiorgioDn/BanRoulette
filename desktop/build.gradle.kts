@@ -42,9 +42,11 @@ dependencies {
     // H2 embedded database
     implementation(libs.h2)
 
-    // JUnit 5
+    // JUnit 5 & Contract test fixtures
+    testImplementation(testFixtures(project(":core")))
     testImplementation(libs.junit.jupiter)
     testRuntimeOnly(libs.junit.platform.launcher)
+    testRuntimeOnly(libs.junit.vintage.engine)
 }
 
 // ── Test configuration ─────────────────────────────────────────────────────────

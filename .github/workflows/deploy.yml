@@ -14,8 +14,29 @@ permissions:
   contents: write
 
 jobs:
+  test:
+    name: Tests & Quality Gates
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Run Core, Desktop & Android Tests
+        run: ./gradlew :core:test :desktop:test :android:testDebugUnitTest --no-daemon
+
   desktop:
     name: Desktop on ${{ matrix.os }}
+    needs: [test]
     runs-on: ${{ matrix.os }}
 
     strategy:
@@ -76,6 +97,7 @@ jobs:
 
   android:
     name: Android APK
+    needs: [test]
     runs-on: ubuntu-latest
 
     steps:
@@ -116,7 +138,7 @@ jobs:
 
   release:
     name: Publish GitHub Release
-    needs: [desktop, android]
+    needs: [test, desktop, android]
     runs-on: ubuntu-latest
 
     steps:

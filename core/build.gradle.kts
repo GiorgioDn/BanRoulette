@@ -1,5 +1,6 @@
 plugins {
     `java-library`
+    `java-test-fixtures`
 }
 
 java {
@@ -14,6 +15,9 @@ tasks.withType<JavaCompile> {
 }
 
 dependencies {
+    testFixturesApi(libs.junit)
+    testFixturesApi(libs.junit.jupiter)
+
     testImplementation(libs.junit.jupiter)
     testRuntimeOnly(libs.junit.platform.launcher)
 }

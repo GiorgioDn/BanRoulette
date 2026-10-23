@@ -13,6 +13,7 @@ import com.example.core.service.BanService
 import com.example.core.validator.NameValidator
 import com.example.model.BannedName
 import com.example.model.SavedName
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -26,9 +27,13 @@ enum class AppScreen {
     BANNED_HISTORY
 }
 
-class MainViewModel(application: Application) : AndroidViewModel(application) {
+class MainViewModel(
+    application: Application,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    database: AppDatabase? = null
+) : AndroidViewModel(application) {
 
-    private val db = AppDatabase.getDatabase(application)
+    private val db = database ?: AppDatabase.getDatabase(application)
     private val nameRepository = RoomNameRepository(db)
     private val bannedRepository = RoomBannedRepository(db)
     val banService = BanService(nameRepository, bannedRepository)
@@ -83,7 +88,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun loadInitialData() {
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(ioDispatcher) {
             loadSavedNamesInternal()
             loadBannedHistoryInternal()
             loadLastUsedParticipantsInternal()
@@ -165,28 +170,28 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun deleteSavedName(id: Long) {
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(ioDispatcher) {
             banService.removeSavedName(id)
             loadSavedNamesInternal()
         }
     }
 
     fun deleteBannedName(id: Long) {
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(ioDispatcher) {
             banService.restore(id)
             loadBannedHistoryInternal()
         }
     }
 
     fun clearAllSavedNames() {
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(ioDispatcher) {
             banService.clearAllSavedNames()
             loadSavedNamesInternal()
         }
     }
 
     fun clearAllBannedHistory() {
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(ioDispatcher) {
             banService.clearAllBanned()
             loadBannedHistoryInternal()
         }
@@ -222,7 +227,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         // Persist participants on wheel in background
         val currentNames = _participants.value
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(ioDispatcher) {
             banService.recordSpinUsage(currentNames)
             loadSavedNamesInternal()
         }
@@ -241,7 +246,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _isHammerStriking.value = false
         val winner = _currentWinner.value
         if (winner != null) {
-            viewModelScope.launch(Dispatchers.IO) {
+            viewModelScope.launch(ioDispatcher) {
                 val record = banService.ban(winner)
                 _winnerBanCount.value = record.banCount
                 loadBannedHistoryInternal()

@@ -82,6 +82,13 @@ android {
     }
 
     // Step 4: Share core resources directly with Android assets (single source of truth)
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true
+            isReturnDefaultValues = true
+        }
+    }
+
     sourceSets {
         getByName("main") {
             assets.srcDirs("../core/src/main/resources")
@@ -108,7 +115,12 @@ dependencies {
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
 
+    // Testing
+    testImplementation(testFixtures(project(":core")))
     testImplementation(libs.junit)
+    testImplementation(libs.androidx.test.core)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.kotlinx.coroutines.test)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))
