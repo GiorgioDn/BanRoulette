@@ -61,22 +61,30 @@ A modern, high-polish desktop application built with **Java 21** and **JavaFX** 
 ## 🚀 Getting Started
 
 ### 1. Run Locally with Gradle
-To launch the application in development mode:
+
+**Desktop App:**
 ```bash
 git clone https://github.com/GiorgioDn/BanRoulette.git
 cd BanRoulette
-./gradlew run
+./gradlew :desktop:run
 ```
-*(On Windows PowerShell / CMD: `.\gradlew.bat run`)*
+*(On Windows PowerShell / CMD: `.\gradlew.bat :desktop:run`)*
+
+**Android App:**
+```bash
+./gradlew :android:assembleDebug
+# or build signed release APK:
+bash scripts/android-build.sh
+```
 
 ### 2. Build and Test
-To compile, validate all resources, and run the test suite:
+To compile, validate all resources, and run the test suite across all modules:
 ```bash
 ./gradlew check
-# or build everything including the jpackage staging:
-./gradlew build
+# or build everything including the desktop jpackage staging:
+./gradlew :desktop:assemble
 ```
-*(On Windows PowerShell / CMD: `.\gradlew.bat build`)*
+*(On Windows PowerShell / CMD: `.\gradlew.bat :desktop:assemble`)*
 
 This executes all 74 unit, integration, and lifecycle tests (including in-memory H2 DAO tests, saved names catalog tests, wheel geometry tests, animation angle math tests, and schema-initialization idempotency tests).
 
@@ -101,36 +109,42 @@ Ban Roulette stores participants, saved names, and ban history in a local, embed
 
 ## 📦 Packaging & Release Pipeline
 
-The application uses `jpackage` to bundle the application JAR, JavaFX runtime, and dependencies into self-contained native installers.
+The application uses `jpackage` to bundle the desktop application JAR, JavaFX runtime, and dependencies into self-contained native installers, and Gradle AGP to assemble the Android release APK.
 
 ### Local Packaging
 
-Make sure `./gradlew assemble` or `./gradlew build` has been run first to stage `build/jpackage-input/`.
+Make sure `./gradlew :desktop:assemble` has been run first to stage `desktop/build/jpackage-input/`.
 
 - **macOS (`.pkg`)**:
   ```bash
   bash scripts/package.sh
   ```
-  Produces `build/installer/BanRoulette-1.0.0.pkg`.
+  Produces `desktop/build/installer/BanRoulette-1.0.0.pkg`.
 
 - **Windows (`.exe`)**:
   ```powershell
   pwsh scripts/package.ps1
   ```
-  Produces `build/installer/BanRoulette-1.0.0.exe` (requires WiX Toolset).
+  Produces `desktop/build/installer/BanRoulette-1.0.0.exe` (requires WiX Toolset).
 
 - **Linux (`.deb`)**:
   ```bash
   bash scripts/package.sh
   ```
-  Produces `build/installer/banroulette_1.0.0_amd64.deb`.
+  Produces `desktop/build/installer/banroulette_1.0.0_amd64.deb`.
+
+- **Android (`.apk`)**:
+  ```bash
+  bash scripts/android-build.sh
+  ```
+  Produces `android/build/outputs/apk/release/android-release.apk`.
 
 ### Continuous Integration & Release (GitHub Actions)
 The workflow located at [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) automatically triggers on pushes to `main`:
-1. **Multi-Platform Matrix Build**: Compiles and verifies the project on `ubuntu-latest`, `macos-latest`, and `windows-latest`.
-2. **Quality Gate**: Runs `./gradlew build --no-daemon` — any failing test immediately halts the pipeline.
-3. **Installer Packaging**: Runs platform packaging scripts to generate `.pkg`, `.exe`, and `.deb` installers from `build/jpackage-input/`.
-4. **Predictable Release Tagging**: Reads the project version from `build.gradle.kts` (e.g. `1.0.0`) and publishes a GitHub Release tagged `v1.0.0` attaching all three native installer binaries.
+1. **Multi-Platform Matrix Build**: Compiles and verifies desktop on `ubuntu-latest`, `macos-latest`, and `windows-latest`, and Android on `ubuntu-latest`.
+2. **Quality Gate**: Runs `./gradlew :desktop:check :desktop:assemble` and `./gradlew :android:assembleRelease` — failing tests immediately halt the pipeline.
+3. **Installer Packaging**: Runs platform packaging scripts to generate `.pkg`, `.exe`, and `.deb` installers from `desktop/build/jpackage-input/`, and bundles `BanRoulette.apk`.
+4. **Predictable Release Tagging**: Reads the project version from `desktop/build.gradle.kts` (e.g. `1.0.0`) and publishes a GitHub Release tagged `v1.0.0` attaching all native installer binaries and the Android APK.
 
 > [!NOTE]
 > **Bypassing Unsigned Installer Warnings**:

@@ -24,17 +24,17 @@ jobs:
         include:
           - os: ubuntu-latest
             script: bash scripts/package.sh
-            artifact_glob: build/installer/*.deb
+            artifact_glob: desktop/build/installer/*.deb
             artifact_name: BanRoulette-linux.deb
 
           - os: macos-latest
             script: bash scripts/package.sh
-            artifact_glob: build/installer/*.pkg
+            artifact_glob: desktop/build/installer/*.pkg
             artifact_name: BanRoulette-macos.pkg
 
           - os: windows-latest
             script: pwsh scripts/package.ps1
-            artifact_glob: build/installer/*.exe
+            artifact_glob: desktop/build/installer/*.exe
             artifact_name: BanRoulette-windows.exe
 
     steps:
@@ -52,7 +52,7 @@ jobs:
 
       # Build + run tests + stage jpackage-input/
       - name: Build and test desktop
-        run: ./gradlew check assemble --no-daemon
+        run: ./gradlew :desktop:check :desktop:assemble --no-daemon
 
       # Run the platform packaging script
       - name: Package installer
@@ -62,7 +62,7 @@ jobs:
       - name: Rename artifact
         shell: bash
         run: |
-          src=$(find build/installer -maxdepth 1 \
+          src=$(find desktop/build/installer -maxdepth 1 \
                   \( -name "*.deb" -o -name "*.pkg" -o -name "*.exe" \) \
                   | head -n 1)
           cp "$src" "${{ matrix.artifact_name }}"
@@ -123,11 +123,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Extract project version from build.gradle.kts
+      - name: Extract project version from desktop/build.gradle.kts
         id: get_version
         shell: bash
         run: |
-          VERSION=$(grep -m 1 'version = ' build.gradle.kts | sed -E 's/.*version = "(.*)".*/\1/' | tr -d '[:space:]')
+          VERSION=$(grep -m 1 'version = ' desktop/build.gradle.kts | sed -E 's/.*version = "(.*)".*/\1/' | tr -d '[:space:]')
           echo "VERSION=${VERSION}" >> "$GITHUB_OUTPUT"
 
       - name: Download all installers

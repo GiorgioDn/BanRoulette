@@ -21,4 +21,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "ban-roulette"
-include(":android")
+include(":core", ":desktop", ":android")

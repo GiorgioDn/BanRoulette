@@ -7,19 +7,19 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
-INPUT_DIR="${PROJECT_DIR}/build/jpackage-input"
-OUTPUT_DIR="${PROJECT_DIR}/build/installer"
+INPUT_DIR="${PROJECT_DIR}/desktop/build/jpackage-input"
+OUTPUT_DIR="${PROJECT_DIR}/desktop/build/installer"
 MAIN_CLASS="com.example.app.AppLauncher"
 APP_NAME="BanRoulette"
 
 # Auto-detect built jar and version from jpackage-input
-JAR_PATH=$(find "${INPUT_DIR}" -maxdepth 1 -name "ban_roulette-*.jar" 2>/dev/null | head -n 1 || true)
+JAR_PATH=$(find "${INPUT_DIR}" -maxdepth 1 \( -name "desktop-*.jar" -o -name "ban_roulette-*.jar" \) 2>/dev/null | head -n 1 || true)
 if [[ -n "${JAR_PATH}" ]]; then
     MAIN_JAR="$(basename "${JAR_PATH}")"
-    APP_VERSION="${MAIN_JAR#ban_roulette-}"
+    APP_VERSION="${MAIN_JAR#*-}"
     APP_VERSION="${APP_VERSION%.jar}"
 else
-    MAIN_JAR="ban_roulette-1.0.0.jar"
+    MAIN_JAR="desktop-1.0.0.jar"
     APP_VERSION="1.0.0"
 fi
 
@@ -34,10 +34,10 @@ esac
 echo "==> Packaging ${APP_NAME} as .${PKG_TYPE} ..."
 mkdir -p "${OUTPUT_DIR}"
 
-# Icon path (optional — add src/main/resources/icon.icns or icon.png later)
+# Icon path (optional — add desktop/src/main/resources/icon.icns or icon.png later)
 ICON_ARG=""
-ICON_ICNS="${PROJECT_DIR}/src/main/resources/icon.icns"
-ICON_PNG="${PROJECT_DIR}/src/main/resources/icon.png"
+ICON_ICNS="${PROJECT_DIR}/desktop/src/main/resources/icon.icns"
+ICON_PNG="${PROJECT_DIR}/desktop/src/main/resources/icon.png"
 if [[ "${OS}" == "Darwin" && -f "${ICON_ICNS}" ]]; then
     ICON_ARG="--icon ${ICON_ICNS}"
 elif [[ "${OS}" == "Linux" && -f "${ICON_PNG}" ]]; then
