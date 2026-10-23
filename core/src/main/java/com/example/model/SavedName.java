@@ -5,10 +5,6 @@ import java.util.Objects;
 
 /**
  * Represents a participant name stored in the database's saved names catalog.
- *
- * <p>Persisted in the {@code saved_names} table. This table acts as a persistent
- * catalog of all names entered into the application, allowing them to be quickly
- * browsed and clicked to be added back into the active roulette wheel at any time.
  */
 public class SavedName {
 

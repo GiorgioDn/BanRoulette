@@ -3,8 +3,7 @@ package com.example.model;
 import java.time.LocalDateTime;
 
 /**
- * Represents a name that has been banned from the wheel.
- * Persisted in the {@code banned_names} table (Step 3).
+ * Represents a name that has been banned from the wheel with its cumulative ban count.
  */
 public class BannedName {
 
@@ -13,7 +12,7 @@ public class BannedName {
     private int banCount;
     private LocalDateTime bannedAt;
 
-    /** In-memory constructor (used before DB is wired up). Defaults to 1 ban. */
+    /** In-memory constructor (defaults to 1 ban). */
     public BannedName(String name) {
         this(0, name, 1, LocalDateTime.now());
     }
@@ -28,7 +27,7 @@ public class BannedName {
         this.id = id;
         this.name = name;
         this.banCount = Math.max(1, banCount);
-        this.bannedAt = bannedAt;
+        this.bannedAt = (bannedAt != null) ? bannedAt : LocalDateTime.now();
     }
 
     public long getId()                              { return id; }

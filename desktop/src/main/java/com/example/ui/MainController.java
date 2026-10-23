@@ -2,6 +2,9 @@ package com.example.ui;
 
 import com.example.anim.HitAnimation;
 import com.example.anim.SpinAnimation;
+import com.example.core.calculator.SpinCalculator;
+import com.example.core.selector.WinnerSelector;
+import com.example.core.validator.NameValidator;
 import com.example.db.BannedDao;
 import com.example.db.DatabaseManager;
 import com.example.db.SavedNamesDao;
@@ -136,6 +139,7 @@ public class MainController {
     private final SpinAnimation  spinAnimation  = new SpinAnimation();
     private final HitAnimation   hitAnimation   = new HitAnimation();
     private final HammerLoader   hammerLoader   = new HammerLoader();
+    private final WinnerSelector winnerSelector = new WinnerSelector();
 
     /**
      * Group wrapper holding wheel, pointer, and hammer for responsive proportional scaling.
@@ -329,24 +333,15 @@ public class MainController {
         if (isSpinning) {
             return;
         }
-        String raw  = nameInput.getText();
-        String name = (raw == null) ? "" : raw.trim();
-
-        if (name.isEmpty()) {
-            flashStatus("Type a name first.");
-            return;
-        }
-        if (name.length() > 50) {
-            flashStatus("Name too long — max 50 characters.");
-            return;
-        }
-        if (participants.size() >= WheelGenerator.MAX_PARTICIPANTS) {
-            flashStatus("Limit reached — max " + WheelGenerator.MAX_PARTICIPANTS + " participants.");
+        NameValidator.ValidationResult result = NameValidator.validateForAdd(
+                nameInput.getText(), participants.size(), WheelGenerator.MAX_PARTICIPANTS);
+        if (!result.isValid()) {
+            flashStatus(result.getErrorMessage());
             return;
         }
 
         // Add to participants purely in-memory (no DB call)
-        Participant p = new Participant(name);
+        Participant p = new Participant(result.getCleanedName());
         participants.add(p);
         nameInput.clear();
         nameInput.requestFocus();
@@ -371,7 +366,7 @@ public class MainController {
         if (isSpinning) {
             return;
         }
-        if (participants.size() < 2) {
+        if (!NameValidator.canSpin(participants.size())) {
             flashStatus("Need at least 2 participants to spin.");
             return;
         }
@@ -392,7 +387,7 @@ public class MainController {
         if (dbManager != null && dbManager.getConnection() != null) {
             Task<Void> saveTask = new Task<>() {
                 @Override protected Void call() throws Exception {
-                    new SavedNamesDao(dbManager.getConnection()).recordUsage(participantNames);
+                    dbManager.getBanService().recordSpinUsage(participantNames);
                     return null;
                 }
             };
@@ -423,16 +418,16 @@ public class MainController {
 
         // 1. Fair pre-selection of winner (testable, independent of animation physics)
         SecureRandom random = new SecureRandom();
-        int winnerIndex = SpinAnimation.pickRandomWinner(participants.size(), random);
+        int winnerIndex = winnerSelector.selectWinnerIndex(participants.size());
         currentWinner = participants.get(winnerIndex);
 
         // 2. Random offset within ±40% of slice angle for natural stopping variation
         double offsetFactor = (random.nextDouble() * 2.0) - 1.0; // [-1.0, 1.0]
-        double offset = SpinAnimation.computeRandomOffset(participants.size(), offsetFactor);
+        double offset = SpinCalculator.computeRandomOffset(participants.size(), offsetFactor);
         int fullSpins = 5 + random.nextInt(3); // 5 to 7 full revolutions
 
         // 3. Compute target angle guaranteeing forward rotation and exact landing
-        double targetAngle = SpinAnimation.computeTargetAngle(
+        double targetAngle = SpinCalculator.computeTargetAngle(
                 currentWheel.getRotate(), winnerIndex, participants.size(), fullSpins, offset);
 
         flashStatus("Spinning the wheel…");
@@ -490,8 +485,7 @@ public class MainController {
             if (dbManager != null && dbManager.getConnection() != null) {
                 Task<BannedName> banTask = new Task<>() {
                     @Override protected BannedName call() throws Exception {
-                        BannedDao bannedDao = new BannedDao(dbManager.getConnection());
-                        return bannedDao.recordBan(winner.getName());
+                        return dbManager.getBanService().ban(winner.getName());
                     }
                 };
                 banTask.setOnSucceeded(ev -> {
@@ -570,7 +564,7 @@ public class MainController {
 
         Task<List<BannedName>> loadTask = new Task<>() {
             @Override protected List<BannedName> call() throws Exception {
-                return new BannedDao(dbManager.getConnection()).findAll();
+                return dbManager.getBanService().getBannedHistory();
             }
         };
 
@@ -600,7 +594,7 @@ public class MainController {
 
         Task<List<SavedName>> loadTask = new Task<>() {
             @Override protected List<SavedName> call() throws Exception {
-                return new SavedNamesDao(dbManager.getConnection()).findAll();
+                return dbManager.getBanService().getSavedNames();
             }
         };
 
@@ -632,7 +626,7 @@ public class MainController {
 
         Task<List<String>> loadTask = new Task<>() {
             @Override protected List<String> call() throws Exception {
-                return new SavedNamesDao(dbManager.getConnection()).findLastUsedNames();
+                return dbManager.getBanService().getLastUsedNames();
             }
         };
 
@@ -834,7 +828,7 @@ public class MainController {
         if (dbManager != null && dbManager.getConnection() != null) {
             Task<Void> deleteTask = new Task<>() {
                 @Override protected Void call() throws Exception {
-                    new BannedDao(dbManager.getConnection()).delete(item.getId());
+                    dbManager.getBanService().restore(item.getId());
                     return null;
                 }
             };
@@ -869,7 +863,7 @@ public class MainController {
         if (dbManager != null && dbManager.getConnection() != null) {
             Task<Void> clearTask = new Task<>() {
                 @Override protected Void call() throws Exception {
-                    new BannedDao(dbManager.getConnection()).deleteAll();
+                    dbManager.getBanService().clearAllBanned();
                     return null;
                 }
             };
@@ -1009,7 +1003,7 @@ public class MainController {
         if (dbManager != null && dbManager.getConnection() != null) {
             Task<Void> delTask = new Task<>() {
                 @Override protected Void call() throws Exception {
-                    new SavedNamesDao(dbManager.getConnection()).delete(item.getId());
+                    dbManager.getBanService().removeSavedName(item.getId());
                     return null;
                 }
             };
@@ -1067,7 +1061,7 @@ public class MainController {
         if (dbManager != null && dbManager.getConnection() != null) {
             Task<Void> clearTask = new Task<>() {
                 @Override protected Void call() throws Exception {
-                    new SavedNamesDao(dbManager.getConnection()).deleteAll();
+                    dbManager.getBanService().clearAllSavedNames();
                     return null;
                 }
             };

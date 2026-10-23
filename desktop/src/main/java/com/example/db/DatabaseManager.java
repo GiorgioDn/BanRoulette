@@ -1,5 +1,9 @@
 package com.example.db;
 
+import com.example.core.repository.BannedRepository;
+import com.example.core.repository.NameRepository;
+import com.example.core.service.BanService;
+
 import java.io.File;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -142,6 +146,33 @@ public class DatabaseManager {
                 connection = null;
             }
         }
+    }
+
+    /**
+     * Returns an H2-backed {@link NameRepository} for participant and catalog persistence.
+     */
+    public NameRepository getNameRepository() {
+        if (connection == null) {
+            throw new IllegalStateException("Database is not connected");
+        }
+        return new H2NameRepository(connection);
+    }
+
+    /**
+     * Returns an H2-backed {@link BannedRepository} with atomic transactions.
+     */
+    public BannedRepository getBannedRepository() {
+        if (connection == null) {
+            throw new IllegalStateException("Database is not connected");
+        }
+        return new H2BannedRepository(connection);
+    }
+
+    /**
+     * Returns a {@link BanService} configured with the desktop H2 repositories.
+     */
+    public BanService getBanService() {
+        return new BanService(getNameRepository(), getBannedRepository());
     }
 
     // ── Private helpers ────────────────────────────────────────────────────────

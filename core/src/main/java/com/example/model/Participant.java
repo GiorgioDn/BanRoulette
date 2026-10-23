@@ -4,7 +4,6 @@ import java.time.LocalDateTime;
 
 /**
  * Represents a participant eligible to be spun on the wheel.
- * Persisted in the {@code names} table (Step 3).
  */
 public class Participant {
 
@@ -12,23 +11,21 @@ public class Participant {
     private String name;
     private LocalDateTime createdAt;
 
-    /** In-memory constructor (used before DB is wired up). */
+    /** In-memory constructor (defaults to id=0, createdAt=now). */
     public Participant(String name) {
-        this.name = name;
+        this(0, name, LocalDateTime.now());
     }
 
     /** Constructor with id and name. */
     public Participant(long id, String name) {
-        this.id = id;
-        this.name = name;
-        this.createdAt = LocalDateTime.now();
+        this(id, name, LocalDateTime.now());
     }
 
     /** Full constructor for DB-backed rows. */
     public Participant(long id, String name, LocalDateTime createdAt) {
         this.id = id;
         this.name = name;
-        this.createdAt = createdAt;
+        this.createdAt = (createdAt != null) ? createdAt : LocalDateTime.now();
     }
 
     public long getId()                    { return id; }
@@ -40,7 +37,7 @@ public class Participant {
     public LocalDateTime getCreatedAt()              { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt){ this.createdAt = createdAt; }
 
-    /** Used by the ListView cell factory to display the participant's name. */
+    /** Used by cell factories and lists to display the participant's name. */
     @Override
     public String toString() { return name; }
 }
