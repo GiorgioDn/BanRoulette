@@ -5,4 +5,5 @@ module com.example.core {
     exports com.example.core.validator;
     exports com.example.core.repository;
     exports com.example.core.service;
+    exports com.example.core.geometry;
 }

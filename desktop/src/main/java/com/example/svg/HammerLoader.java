@@ -45,7 +45,7 @@ public class HammerLoader {
     public Group loadHammer() {
         Group inner = new Group();
 
-        try (InputStream is = getClass().getResourceAsStream("/svg/hammer.svg")) {
+        try (InputStream is = openHammerStream()) {
             if (is != null) {
                 DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
                 // Disable external entities for safety
@@ -86,6 +86,12 @@ public class HammerLoader {
         Group root = new Group(inner);
         root.setId("ban-hammer");
         return root;
+    }
+
+    private InputStream openHammerStream() {
+        InputStream is = getClass().getResourceAsStream("/svg/hammer.svg");
+        if (is != null) return is;
+        return getClass().getResourceAsStream("/hammer.svg");
     }
 
     private Node parseSvgElement(Element el) {

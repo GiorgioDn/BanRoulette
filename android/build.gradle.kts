@@ -79,6 +79,13 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+
+    // Step 4: Share core resources directly with Android assets (single source of truth)
+    sourceSets {
+        getByName("main") {
+            assets.srcDirs("../core/src/main/resources")
+        }
+    }
 }
 
 dependencies {
