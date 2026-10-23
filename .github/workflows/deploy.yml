@@ -14,8 +14,8 @@ permissions:
   contents: write
 
 jobs:
-  build:
-    name: Build on ${{ matrix.os }}
+  desktop:
+    name: Desktop on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
 
     strategy:
@@ -51,8 +51,8 @@ jobs:
         uses: gradle/actions/setup-gradle@v3
 
       # Build + run tests + stage jpackage-input/
-      - name: Build with Gradle
-        run: ./gradlew build --no-daemon
+      - name: Build and test desktop
+        run: ./gradlew check assemble --no-daemon
 
       # Run the platform packaging script
       - name: Package installer
@@ -74,9 +74,49 @@ jobs:
           path: ${{ matrix.artifact_name }}
           if-no-files-found: error
 
+  android:
+    name: Android APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Build Android Release APK
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          ./gradlew :android:assembleRelease \
+            -PversionCode=${{ github.run_number }} \
+            --no-daemon
+
+      - name: Rename APK for release
+        shell: bash
+        run: |
+          cp android/build/outputs/apk/release/android-release.apk BanRoulette.apk
+
+      - name: Upload Android APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: BanRoulette.apk
+          path: BanRoulette.apk
+          if-no-files-found: error
+
   release:
     name: Publish GitHub Release
-    needs: build
+    needs: [desktop, android]
     runs-on: ubuntu-latest
 
     steps:
@@ -105,12 +145,13 @@ jobs:
             Release of **Ban Roulette v${{ steps.get_version.outputs.VERSION }}**.
             Commit: `${{ github.sha }}`
 
-            ### Installers
+            ### Downloads & Installers
             - **macOS**: `BanRoulette-macos.pkg`
             - **Windows**: `BanRoulette-windows.exe`
             - **Linux**: `BanRoulette-linux.deb`
+            - **Android**: `BanRoulette.apk`
 
-            > ⚠️ **Unsigned installers** – macOS Gatekeeper and Windows SmartScreen
-            > will warn on first launch. Right-click → Open to bypass on macOS.
+            > ⚠️ **Unsigned installers** – macOS Gatekeeper, Windows SmartScreen, and Android
+            > will display safety warnings on first launch.
           files: installers/*
           generate_release_notes: false

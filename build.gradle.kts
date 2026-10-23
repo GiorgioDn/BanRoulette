@@ -35,10 +35,6 @@ application {
     )
 }
 
-// ── Repositories ───────────────────────────────────────────────────────────────
-repositories {
-    mavenCentral()
-}
 
 // ── Dependencies ───────────────────────────────────────────────────────────────
 dependencies {
