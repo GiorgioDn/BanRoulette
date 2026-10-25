@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.FormatListBulleted
 import androidx.compose.material.icons.filled.Block
+import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
@@ -28,6 +29,7 @@ import com.example.banroulette.ui.AppScreen
 import com.example.banroulette.ui.MainViewModel
 import com.example.banroulette.ui.components.BanResultDialog
 import com.example.banroulette.ui.screens.BannedHistoryScreen
+import com.example.banroulette.ui.screens.ParticipantsScreen
 import com.example.banroulette.ui.screens.SavedNamesScreen
 import com.example.banroulette.ui.screens.WheelScreen
 import com.example.banroulette.ui.theme.BanRouletteTheme
@@ -40,7 +42,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            BanRouletteTheme {
+            BanRouletteTheme(darkTheme = true) {
                 MainApp(viewModel = viewModel)
             }
         }
@@ -62,9 +64,9 @@ fun MainApp(viewModel: MainViewModel) {
     val showResultDialog by viewModel.showResultDialog.collectAsState()
     val statusMessage by viewModel.statusMessage.collectAsState()
 
-    // Handle back button: return to Wheel screen if currently in Saved or Banned
-    BackHandler(enabled = currentScreen != AppScreen.WHEEL) {
-        viewModel.setScreen(AppScreen.WHEEL)
+    // Handle back button: return to Spin screen if currently in other screens
+    BackHandler(enabled = currentScreen != AppScreen.SPIN) {
+        viewModel.setScreen(AppScreen.SPIN)
     }
 
     val totalBans = bannedList.sumOf { it.banCount }
@@ -74,10 +76,24 @@ fun MainApp(viewModel: MainViewModel) {
         bottomBar = {
             NavigationBar {
                 NavigationBarItem(
-                    selected = currentScreen == AppScreen.WHEEL,
-                    onClick = { viewModel.setScreen(AppScreen.WHEEL) },
-                    icon = { Icon(Icons.Default.PlayArrow, contentDescription = "Wheel") },
-                    label = { Text("Wheel") }
+                    selected = currentScreen == AppScreen.SPIN,
+                    onClick = { viewModel.setScreen(AppScreen.SPIN) },
+                    icon = { Icon(Icons.Default.PlayArrow, contentDescription = "Spin") },
+                    label = { Text("Spin") }
+                )
+                NavigationBarItem(
+                    selected = currentScreen == AppScreen.PARTICIPANTS,
+                    onClick = { viewModel.setScreen(AppScreen.PARTICIPANTS) },
+                    icon = {
+                        if (participants.isNotEmpty()) {
+                            BadgedBox(badge = { Badge { Text("${participants.size}") } }) {
+                                Icon(Icons.Default.Group, contentDescription = "Participants")
+                            }
+                        } else {
+                            Icon(Icons.Default.Group, contentDescription = "Participants")
+                        }
+                    },
+                    label = { Text("Participants") }
                 )
                 NavigationBarItem(
                     selected = currentScreen == AppScreen.SAVED_NAMES,
@@ -116,7 +132,7 @@ fun MainApp(viewModel: MainViewModel) {
                 .padding(innerPadding)
         ) {
             when (currentScreen) {
-                AppScreen.WHEEL -> {
+                AppScreen.SPIN -> {
                     WheelScreen(
                         participants = participants,
                         isSpinning = isSpinning,
@@ -125,12 +141,25 @@ fun MainApp(viewModel: MainViewModel) {
                         currentAngle = currentAngle,
                         statusMessage = statusMessage,
                         getBanCountFor = { viewModel.getBanCountFor(it) },
+                        onSpinClick = { viewModel.startSpin() },
+                        onSpinAnimationFinished = { viewModel.onSpinAnimationFinished(it) },
+                        onHammerStrikeFinished = { viewModel.onHammerStrikeFinished() },
+                        onNavigateToParticipants = { viewModel.setScreen(AppScreen.PARTICIPANTS) }
+                    )
+                }
+
+                AppScreen.PARTICIPANTS -> {
+                    ParticipantsScreen(
+                        participants = participants,
+                        savedNames = savedNames,
+                        statusMessage = statusMessage,
+                        getBanCountFor = { viewModel.getBanCountFor(it) },
                         onAddParticipant = { viewModel.addParticipant(it) },
                         onRemoveParticipant = { viewModel.removeParticipant(it) },
                         onClearParticipants = { viewModel.clearParticipants() },
-                        onSpinClick = { viewModel.startSpin() },
-                        onSpinAnimationFinished = { viewModel.onSpinAnimationFinished(it) },
-                        onHammerStrikeFinished = { viewModel.onHammerStrikeFinished() }
+                        onAddParticipantFromSaved = { viewModel.addParticipantFromSaved(it) },
+                        onAddAllSavedToWheel = { viewModel.addAllSavedToWheel() },
+                        onNavigateToSpin = { viewModel.setScreen(AppScreen.SPIN) }
                     )
                 }
 

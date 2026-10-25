@@ -18,6 +18,8 @@ private val DarkColorScheme = darkColorScheme(
     onPrimaryContainer = Color.White,
     secondary = BrandPink,
     onSecondary = Color.White,
+    secondaryContainer = Color(0xFF1E293B),
+    onSecondaryContainer = Color(0xFFE2E8F0),
     tertiary = BrandRed,
     background = DarkBackground,
     surface = DarkSurface,
@@ -49,7 +51,7 @@ private val LightColorScheme = lightColorScheme(
 
 @Composable
 fun BanRouletteTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    darkTheme: Boolean = true,
     dynamicColor: Boolean = false, // Use our brand colors by default for consistent branding
     content: @Composable () -> Unit
 ) {

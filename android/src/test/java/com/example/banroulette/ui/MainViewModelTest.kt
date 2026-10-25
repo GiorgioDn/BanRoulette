@@ -130,7 +130,10 @@ class MainViewModelTest {
 
     @Test
     fun testNavigationScreens() {
-        assertEquals(AppScreen.WHEEL, viewModel.currentScreen.value)
+        assertEquals(AppScreen.SPIN, viewModel.currentScreen.value)
+
+        viewModel.setScreen(AppScreen.PARTICIPANTS)
+        assertEquals(AppScreen.PARTICIPANTS, viewModel.currentScreen.value)
 
         viewModel.setScreen(AppScreen.SAVED_NAMES)
         assertEquals(AppScreen.SAVED_NAMES, viewModel.currentScreen.value)
@@ -138,7 +141,7 @@ class MainViewModelTest {
         viewModel.setScreen(AppScreen.BANNED_HISTORY)
         assertEquals(AppScreen.BANNED_HISTORY, viewModel.currentScreen.value)
 
-        viewModel.setScreen(AppScreen.WHEEL)
-        assertEquals(AppScreen.WHEEL, viewModel.currentScreen.value)
+        viewModel.setScreen(AppScreen.SPIN)
+        assertEquals(AppScreen.SPIN, viewModel.currentScreen.value)
     }
 }

@@ -22,12 +22,17 @@ import kotlinx.coroutines.launch
 import java.security.SecureRandom
 
 enum class AppScreen {
-    WHEEL,
+    SPIN,
+    PARTICIPANTS,
     SAVED_NAMES,
-    BANNED_HISTORY
+    BANNED_HISTORY;
+
+    companion object {
+        val WHEEL = SPIN
+    }
 }
 
-class MainViewModel(
+class MainViewModel @JvmOverloads constructor(
     application: Application,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     database: AppDatabase? = null
@@ -42,7 +47,7 @@ class MainViewModel(
     private val random = SecureRandom()
 
     // Screen navigation
-    private val _currentScreen = MutableStateFlow(AppScreen.WHEEL)
+    private val _currentScreen = MutableStateFlow(AppScreen.SPIN)
     val currentScreen: StateFlow<AppScreen> = _currentScreen.asStateFlow()
 
     // Wheel participants
