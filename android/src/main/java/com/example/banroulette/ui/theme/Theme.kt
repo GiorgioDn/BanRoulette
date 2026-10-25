@@ -1,7 +1,6 @@
 package com.example.banroulette.ui.theme
 
 import android.os.Build
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
@@ -12,40 +11,40 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
 private val DarkColorScheme = darkColorScheme(
-    primary = BrandIndigo,
+    primary = BrandPrimary,
     onPrimary = Color.White,
-    primaryContainer = BrandIndigoDark,
+    primaryContainer = BrandPrimaryDark,
     onPrimaryContainer = Color.White,
-    secondary = BrandPink,
+    secondary = BrandSecondary,
     onSecondary = Color.White,
-    secondaryContainer = Color(0xFF1E293B),
-    onSecondaryContainer = Color(0xFFE2E8F0),
-    tertiary = BrandRed,
+    secondaryContainer = DarkSurfaceVariant,
+    onSecondaryContainer = DarkOnSurface,
+    tertiary = BrandDanger,
     background = DarkBackground,
     surface = DarkSurface,
     surfaceVariant = DarkSurfaceVariant,
     onBackground = DarkOnBackground,
     onSurface = DarkOnSurface,
     onSurfaceVariant = DarkOnSurfaceVariant,
-    error = BrandRed,
+    error = BrandDanger,
     onError = Color.White
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = BrandIndigo,
+    primary = BrandPrimary,
     onPrimary = Color.White,
-    primaryContainer = BrandIndigoDark,
+    primaryContainer = BrandPrimaryDark,
     onPrimaryContainer = Color.White,
-    secondary = BrandPink,
+    secondary = BrandSecondary,
     onSecondary = Color.White,
-    tertiary = BrandRed,
-    background = LightBackground,
-    surface = LightSurface,
-    surfaceVariant = LightSurfaceVariant,
-    onBackground = LightOnBackground,
-    onSurface = LightOnSurface,
-    onSurfaceVariant = LightOnSurfaceVariant,
-    error = BrandRed,
+    tertiary = BrandDanger,
+    background = DarkBackground,
+    surface = DarkSurface,
+    surfaceVariant = DarkSurfaceVariant,
+    onBackground = DarkOnBackground,
+    onSurface = DarkOnSurface,
+    onSurfaceVariant = DarkOnSurfaceVariant,
+    error = BrandDanger,
     onError = Color.White
 )
 

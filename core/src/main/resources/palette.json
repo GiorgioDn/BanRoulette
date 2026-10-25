@@ -1,4 +1,26 @@
 {
+  "theme": {
+    "background": "#0b1120",
+    "surface": "#111827",
+    "surfaceHeader": "#0d1117",
+    "surfaceVariant": "#1f2937",
+    "border": "#1f2937",
+    "borderStrong": "#374151",
+    "textPrimary": "#f9fafb",
+    "textSecondary": "#d1d5db",
+    "textMuted": "#9ca3af",
+    "primary": "#7c3aed",
+    "primaryDark": "#6d28d9",
+    "primaryLight": "#818cf8",
+    "secondary": "#ec4899",
+    "danger": "#ef4444",
+    "dangerDark": "#dc2626",
+    "success": "#10b981",
+    "spinGradientStart": "#f59e0b",
+    "spinGradientEnd": "#ef4444",
+    "savedBadge": "#06b6d4",
+    "wheelBadge": "#3b82f6"
+  },
   "sliceColors": [
     "#6366f1",
     "#ec4899",
@@ -14,6 +36,6 @@
     "#e879f9"
   ],
   "pointerColor": "#f43f5e",
-  "hubOuterColor": "#0f172a",
-  "hubInnerColor": "#6366f1"
+  "hubOuterColor": "#0b1120",
+  "hubInnerColor": "#7c3aed"
 }

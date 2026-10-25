@@ -139,7 +139,7 @@ private fun BannedRow(
             Box(
                 modifier = Modifier
                     .clip(CircleShape)
-                    .background(Color(0xFFEF4444))
+                    .background(com.example.banroulette.ui.theme.BrandDanger)
                     .padding(horizontal = 10.dp, vertical = 4.dp),
                 contentAlignment = Alignment.Center
             ) {

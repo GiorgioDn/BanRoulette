@@ -60,7 +60,7 @@ fun BanResultDialog(
                     modifier = Modifier
                         .size(64.dp)
                         .clip(CircleShape)
-                        .background(Color(0xFFEF4444).copy(alpha = 0.15f)),
+                        .background(com.example.banroulette.ui.theme.BrandDanger.copy(alpha = 0.15f)),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
@@ -77,7 +77,7 @@ fun BanResultDialog(
                         fontWeight = FontWeight.Black,
                         letterSpacing = 1.2.sp
                     ),
-                    color = Color(0xFFEF4444)
+                    color = com.example.banroulette.ui.theme.BrandDanger
                 )
 
                 Spacer(modifier = Modifier.height(8.dp))
@@ -106,7 +106,7 @@ fun BanResultDialog(
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(12.dp))
-                        .background(Color(0xFFEF4444).copy(alpha = 0.12f))
+                        .background(com.example.banroulette.ui.theme.BrandDanger.copy(alpha = 0.12f))
                         .padding(horizontal = 16.dp, vertical = 6.dp)
                 ) {
                     Text(
@@ -114,7 +114,7 @@ fun BanResultDialog(
                         style = MaterialTheme.typography.labelLarge.copy(
                             fontWeight = FontWeight.SemiBold
                         ),
-                        color = Color(0xFFDC2626)
+                        color = com.example.banroulette.ui.theme.BrandDangerDark
                     )
                 }
 

@@ -386,7 +386,7 @@ private fun ParticipantCardRow(
                 Box(
                     modifier = Modifier
                         .clip(CircleShape)
-                        .background(Color(0xFFEF4444))
+                        .background(com.example.banroulette.ui.theme.BrandDanger)
                         .padding(horizontal = 8.dp, vertical = 2.dp)
                 ) {
                     Text(

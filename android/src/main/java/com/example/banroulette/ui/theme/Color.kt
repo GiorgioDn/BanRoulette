@@ -1,26 +1,39 @@
 package com.example.banroulette.ui.theme
 
 import androidx.compose.ui.graphics.Color
+import com.example.core.geometry.AppColorPalette
 
-// Brand colors
-val BrandIndigo = Color(0xFF6366F1)
-val BrandIndigoDark = Color(0xFF4338CA)
-val BrandPink = Color(0xFFEC4899)
-val BrandRed = Color(0xFFEF4444)
-val BrandRedDark = Color(0xFFDC2626)
+// Common Brand colors matching Desktop & Core AppColorPalette
+val BrandPrimary = Color(android.graphics.Color.parseColor(AppColorPalette.PRIMARY))
+val BrandPrimaryDark = Color(android.graphics.Color.parseColor(AppColorPalette.PRIMARY_DARK))
+val BrandPrimaryLight = Color(android.graphics.Color.parseColor(AppColorPalette.PRIMARY_LIGHT))
+val BrandSecondary = Color(android.graphics.Color.parseColor(AppColorPalette.SECONDARY))
+val BrandDanger = Color(android.graphics.Color.parseColor(AppColorPalette.DANGER))
+val BrandDangerDark = Color(android.graphics.Color.parseColor(AppColorPalette.DANGER_DARK))
+val BrandSuccess = Color(android.graphics.Color.parseColor(AppColorPalette.SUCCESS))
 
-// Dark theme palette
-val DarkBackground = Color(0xFF0F172A)
-val DarkSurface = Color(0xFF1E293B)
-val DarkSurfaceVariant = Color(0xFF334155)
-val DarkOnBackground = Color(0xFFF8FAFC)
-val DarkOnSurface = Color(0xFFF1F5F9)
-val DarkOnSurfaceVariant = Color(0xFF94A3B8)
+// CTA Spin Gradient Colors (Amber -> Red gradient matching desktop .btn-spin)
+val SpinGradientStart = Color(android.graphics.Color.parseColor(AppColorPalette.SPIN_GRADIENT_START))
+val SpinGradientEnd = Color(android.graphics.Color.parseColor(AppColorPalette.SPIN_GRADIENT_END))
 
-// Light theme palette
-val LightBackground = Color(0xFFF8FAFC)
-val LightSurface = Color(0xFFFFFFFF)
-val LightSurfaceVariant = Color(0xFFF1F5F9)
-val LightOnBackground = Color(0xFF0F172A)
-val LightOnSurface = Color(0xFF1E293B)
-val LightOnSurfaceVariant = Color(0xFF64748B)
+// Badges
+val BadgeSaved = Color(android.graphics.Color.parseColor(AppColorPalette.SAVED_BADGE))
+val BadgeWheel = Color(android.graphics.Color.parseColor(AppColorPalette.WHEEL_BADGE))
+
+// Dark theme palette (matching Desktop #0B1120 root, #111827 surface, #1F2937 variant)
+val DarkBackground = Color(android.graphics.Color.parseColor(AppColorPalette.BACKGROUND))
+val DarkSurface = Color(android.graphics.Color.parseColor(AppColorPalette.SURFACE))
+val DarkSurfaceHeader = Color(android.graphics.Color.parseColor(AppColorPalette.SURFACE_HEADER))
+val DarkSurfaceVariant = Color(android.graphics.Color.parseColor(AppColorPalette.SURFACE_VARIANT))
+val DarkBorder = Color(android.graphics.Color.parseColor(AppColorPalette.BORDER))
+val DarkBorderStrong = Color(android.graphics.Color.parseColor(AppColorPalette.BORDER_STRONG))
+val DarkOnBackground = Color(android.graphics.Color.parseColor(AppColorPalette.TEXT_PRIMARY))
+val DarkOnSurface = Color(android.graphics.Color.parseColor(AppColorPalette.TEXT_PRIMARY))
+val DarkOnSurfaceVariant = Color(android.graphics.Color.parseColor(AppColorPalette.TEXT_MUTED))
+
+// Backwards compatibility aliases
+val BrandIndigo = BrandPrimary
+val BrandIndigoDark = BrandPrimaryDark
+val BrandPink = BrandSecondary
+val BrandRed = BrandDanger
+val BrandRedDark = BrandDangerDark

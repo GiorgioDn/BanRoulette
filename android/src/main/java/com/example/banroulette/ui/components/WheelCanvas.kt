@@ -210,17 +210,18 @@ private fun DrawScope.drawWheelSlices(
     }
 
     // Outer wheel rim
+    val hub = WheelGeometry.centerHub(radius.toDouble())
+    val outerHubColor = Color(android.graphics.Color.parseColor(palette.hubOuterColor))
+    val innerHubColor = Color(android.graphics.Color.parseColor(palette.hubInnerColor))
+
     drawCircle(
-        color = Color(0xFF0F172A),
+        color = outerHubColor,
         radius = radius - with(density) { 2.dp.toPx() },
         center = center,
         style = Stroke(width = with(density) { 4.dp.toPx() })
     )
 
     // Decorative Center Hub
-    val hub = WheelGeometry.centerHub(radius.toDouble())
-    val outerHubColor = Color(android.graphics.Color.parseColor(palette.hubOuterColor))
-    val innerHubColor = Color(android.graphics.Color.parseColor(palette.hubInnerColor))
 
     drawCircle(
         color = outerHubColor,

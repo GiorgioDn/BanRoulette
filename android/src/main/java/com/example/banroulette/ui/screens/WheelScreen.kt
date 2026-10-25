@@ -41,6 +41,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -48,6 +49,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.banroulette.ui.components.HammerOverlay
 import com.example.banroulette.ui.components.WheelView
+import com.example.banroulette.ui.theme.BrandDanger
+import com.example.banroulette.ui.theme.SpinGradientEnd
+import com.example.banroulette.ui.theme.SpinGradientStart
 
 @Composable
 fun WheelScreen(
@@ -185,7 +189,7 @@ fun WheelScreen(
                                 Box(
                                     modifier = Modifier
                                         .clip(CircleShape)
-                                        .background(Color(0xFFEF4444))
+                                        .background(BrandDanger)
                                         .padding(horizontal = 4.dp, vertical = 1.dp)
                                 ) {
                                     Text(
@@ -234,29 +238,48 @@ fun WheelScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Spin Button
-        Button(
-            onClick = onSpinClick,
-            enabled = !isSpinning && !isHammerStriking && participants.size >= 2,
+        // Spin Button with Common Brand Amber -> Red Gradient
+        val isSpinEnabled = !isSpinning && !isHammerStriking && participants.size >= 2
+        Box(
             modifier = Modifier
                 .fillMaxWidth(0.85f)
-                .height(56.dp),
-            shape = RoundedCornerShape(16.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = Color(0xFF6366F1),
-                disabledContainerColor = Color(0xFF6366F1).copy(alpha = 0.35f)
-            ),
-            elevation = ButtonDefaults.buttonElevation(defaultElevation = 8.dp)
-        ) {
-            Icon(Icons.Default.PlayArrow, contentDescription = "Spin")
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = if (isSpinning) "Spinning…" else "⚡ Spin!",
-                style = MaterialTheme.typography.titleMedium.copy(
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 18.sp
+                .height(56.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .background(
+                    if (isSpinEnabled) {
+                        Brush.horizontalGradient(listOf(SpinGradientStart, SpinGradientEnd))
+                    } else {
+                        Brush.horizontalGradient(
+                            listOf(
+                                SpinGradientStart.copy(alpha = 0.35f),
+                                SpinGradientEnd.copy(alpha = 0.35f)
+                            )
+                        )
+                    }
                 )
-            )
+        ) {
+            Button(
+                onClick = onSpinClick,
+                enabled = isSpinEnabled,
+                modifier = Modifier.fillMaxSize(),
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color.Transparent,
+                    disabledContainerColor = Color.Transparent
+                ),
+                elevation = ButtonDefaults.buttonElevation(defaultElevation = 8.dp)
+            ) {
+                Icon(Icons.Default.PlayArrow, contentDescription = "Spin", tint = Color.White)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = if (isSpinning) "Spinning…" else "⚡ Spin!",
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp,
+                        color = if (isSpinEnabled) Color.White else Color.White.copy(alpha = 0.5f)
+                    )
+                )
+            }
         }
 
         // Status Message Text
