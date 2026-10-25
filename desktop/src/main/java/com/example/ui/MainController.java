@@ -465,8 +465,9 @@ public class MainController {
      */
     void playHammerHitAnimation(Participant winner) {
         Group hammer = hammerLoader.loadHammer();
-        hammer.setTranslateX(110.0);
-        hammer.setTranslateY(-380.0);
+        // Position pivot so the hammer strikes directly onto the winning slice on the wheel
+        hammer.setTranslateX(-90.0);
+        hammer.setTranslateY(-40.0);
 
         if (wheelScaleGroup != null) {
             wheelScaleGroup.getChildren().add(hammer);
