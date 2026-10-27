@@ -189,19 +189,3 @@ Make sure `./gradlew :desktop:assemble` has been run first to stage `desktop/bui
 - **Android APK**: Distributed directly via GitHub Releases. Users must enable "Install unknown apps" in Android settings. (Google Play Store distribution requires an AAB bundle and developer account).
 
 ---
-
-## 🏷️ Versioning Reference
-
-A single source of truth in `gradle.properties` defines version coordinates:
-```properties
-versionName=1.0.0
-versionCode=1
-```
-Desktop installers and the Android `versionName` automatically share this value, while CI/CD overrides `versionCode` with `github.run_number` on each release build.
-
-For detailed guidelines on contributing, architectural boundaries, and secret management, see [CONTRIBUTING.md](CONTRIBUTING.md).
-
----
-
-## 📄 License
-This project is open-source under the MIT License.

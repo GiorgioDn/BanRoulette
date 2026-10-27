@@ -30,7 +30,7 @@ class HitAnimationTest {
     static void initJfx() {
         try {
             Platform.startup(() -> {});
-        } catch (IllegalStateException ignored) {
+        } catch (IllegalStateException | UnsupportedOperationException ignored) {
         }
     }
 

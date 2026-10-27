@@ -17,6 +17,7 @@ jobs:
   test:
     name: Tests & Quality Gates
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - name: Checkout
@@ -31,13 +32,30 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
-      - name: Run Core, Desktop & Android Tests
-        run: ./gradlew :core:test :desktop:test :android:testDebugUnitTest --no-daemon
+      # Cache Robolectric SDK dependencies so they aren't downloaded from scratch on every run
+      - name: Cache Robolectric SDKs
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository/org/robolectric
+          key: ${{ runner.os }}-robolectric-${{ hashFiles('gradle/libs.versions.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-robolectric-
+
+      - name: Run Core Tests
+        run: ./gradlew :core:test --no-daemon
+
+      # JavaFX requires a virtual display (Xvfb) on headless Linux CI
+      - name: Run Desktop Tests (Headless Xvfb)
+        run: xvfb-run --auto-servernum ./gradlew :desktop:test --no-daemon
+
+      - name: Run Android Unit Tests
+        run: ./gradlew :android:testDebugUnitTest --no-daemon
 
   desktop:
     name: Desktop on ${{ matrix.os }}
     needs: [test]
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
 
     strategy:
       fail-fast: false
@@ -71,9 +89,9 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
-      # Build + run tests + stage jpackage-input/
-      - name: Build and test desktop
-        run: ./gradlew :desktop:check :desktop:assemble --no-daemon
+      # Stage jpackage-input/ (unit tests already passed in the test job)
+      - name: Assemble desktop package inputs
+        run: ./gradlew :desktop:assemble -x test --no-daemon
 
       # Run the platform packaging script
       - name: Package installer
@@ -99,6 +117,7 @@ jobs:
     name: Android APK
     needs: [test]
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - name: Checkout
@@ -140,6 +159,7 @@ jobs:
     name: Publish GitHub Release
     needs: [test, desktop, android]
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
       - name: Checkout

@@ -35,8 +35,8 @@ class MainControllerSavedNamesTest {
     static void initJfx() {
         try {
             Platform.startup(() -> {});
-        } catch (IllegalStateException ignored) {
-            // Already initialized
+        } catch (IllegalStateException | UnsupportedOperationException ignored) {
+            // Already initialized or headless without display
         }
     }
 

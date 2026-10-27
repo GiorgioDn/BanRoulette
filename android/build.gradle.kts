@@ -86,6 +86,9 @@ android {
         unitTests {
             isIncludeAndroidResources = true
             isReturnDefaultValues = true
+            all {
+                it.systemProperty("robolectric.enabledSdks", "34")
+            }
         }
     }
 
