@@ -45,8 +45,10 @@ $jpackageArgs = @(
     "--dest",         $OutputDir,
     "--java-options", "--enable-preview",
     "--win-dir-chooser",
+    "--win-per-user-install",
     "--win-menu",
-    "--win-shortcut"
+    "--win-shortcut",
+    "--win-shortcut-prompt"
 ) + $IconArgs
 
 Write-Host "jpackage $jpackageArgs"
