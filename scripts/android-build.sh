@@ -10,7 +10,7 @@ ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 echo "==> Running tests and building Android Release APK..."
 cd "${ROOT_DIR}"
-./gradlew :core:test :android:testDebugUnitTest :android:assembleRelease -PversionCode=1 -PversionName=1.0.0 "$@"
+./gradlew :core:test :android:testDebugUnitTest :android:assembleRelease "$@"
 
 OUTPUT_DIR="${ROOT_DIR}/android/build/outputs/apk/release"
 echo "==> APK generated in: ${OUTPUT_DIR}"

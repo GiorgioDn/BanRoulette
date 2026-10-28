@@ -180,9 +180,9 @@ The CI/CD pipeline located at [`.github/workflows/deploy.yml`](.github/workflows
 
 Make sure `./gradlew :desktop:assemble` has been run first to stage `desktop/build/jpackage-input/`:
 
-- **macOS (`.pkg`)**: `bash scripts/package.sh` $\rightarrow$ `desktop/build/installer/BanRoulette-1.0.0.pkg`
-- **Windows (`.exe`)**: `pwsh scripts/package.ps1` $\rightarrow$ `desktop/build/installer/BanRoulette-1.0.0.exe`
-- **Linux (`.deb`)**: `bash scripts/package.sh` $\rightarrow$ `desktop/build/installer/banroulette_1.0.0_amd64.deb`
+- **macOS (`.pkg`)**: `bash scripts/package.sh` $\rightarrow$ `desktop/build/installer/BanRoulette-1.0.1.pkg`
+- **Windows (`.exe`)**: `pwsh scripts/package.ps1` $\rightarrow$ `desktop/build/installer/BanRoulette-1.0.1.exe`
+- **Linux (`.deb`)**: `bash scripts/package.sh` $\rightarrow$ `desktop/build/installer/banroulette_1.0.1_amd64.deb`
 
 ### Distribution Note
 - **Desktop Installers**: Unsigned standalone installers (right-click $\rightarrow$ Open on macOS Gatekeeper, or "More info" $\rightarrow$ "Run anyway" on Windows SmartScreen).

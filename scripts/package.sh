@@ -19,8 +19,8 @@ if [[ -n "${JAR_PATH}" ]]; then
     APP_VERSION="${MAIN_JAR#*-}"
     APP_VERSION="${APP_VERSION%.jar}"
 else
-    MAIN_JAR="desktop-1.0.0.jar"
-    APP_VERSION="1.0.0"
+    MAIN_JAR="desktop-1.0.1.jar"
+    APP_VERSION="1.0.1"
 fi
 
 # Detect OS

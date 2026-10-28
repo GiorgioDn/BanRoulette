@@ -13,7 +13,7 @@ $MainClass   = "com.example.app.AppLauncher"
 $AppName     = "BanRoulette"
 
 # Auto-detect built jar and version from jpackage-input
-$JarFile = Get-ChildItem -Path $InputDir -Filter "*1.0.0.jar" -ErrorAction SilentlyContinue | Select-Object -First 1
+$JarFile = Get-ChildItem -Path $InputDir -Filter "desktop-*.jar" -ErrorAction SilentlyContinue | Select-Object -First 1
 if (-not $JarFile) {
     $JarFile = Get-ChildItem -Path $InputDir -Filter "*.jar" -ErrorAction SilentlyContinue | Where-Object { $_.Name -notmatch '^(javafx|h2|core)' } | Select-Object -First 1
 }
@@ -21,8 +21,8 @@ if ($JarFile) {
     $MainJar = $JarFile.Name
     $AppVersion = $MainJar -replace '^.*-', '' -replace '\.jar$', ''
 } else {
-    $MainJar = "desktop-1.0.0.jar"
-    $AppVersion = "1.0.0"
+    $MainJar = "desktop-1.0.1.jar"
+    $AppVersion = "1.0.1"
 }
 
 Write-Host "==> Packaging $AppName as .exe ..."
