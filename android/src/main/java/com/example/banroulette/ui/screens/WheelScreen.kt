@@ -267,7 +267,6 @@ fun WheelScreen(
                     containerColor = Color.Transparent,
                     disabledContainerColor = Color.Transparent
                 ),
-                elevation = ButtonDefaults.buttonElevation(defaultElevation = 8.dp)
             ) {
                 Icon(Icons.Default.PlayArrow, contentDescription = "Spin", tint = Color.White)
                 Spacer(modifier = Modifier.width(8.dp))
